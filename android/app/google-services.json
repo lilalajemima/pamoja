@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "286402908642",
+    "project_id": "pamojatest-368a0",
+    "storage_bucket": "pamojatest-368a0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:286402908642:android:249ca6f50fc06e9a0029bb",
+        "android_client_info": {
+          "package_name": "com.example.pamoja"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJO9pr_CB--L14hrMQXR8a40v7xKaG-YM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
