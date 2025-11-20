@@ -5,71 +5,69 @@ import '../../../core/theme/app_theme.dart';
 class MainNavigationScreen extends StatefulWidget {
   final Widget child;
 
-  const MainNavigationScreen({super.key, required this.child});
+  const MainNavigationScreen({
+    super.key,
+    required this.child,
+  });
 
   @override
   State<MainNavigationScreen> createState() => _MainNavigationScreenState();
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
+  int _selectedIndex = 0;
 
   final List<NavigationItem> _navItems = [
     NavigationItem(
-      icon: Icons.home_outlined,
-      selectedIcon: Icons.home,
       label: 'Home',
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home,
       route: '/main/home',
     ),
     NavigationItem(
-      icon: Icons.search_outlined,
-      selectedIcon: Icons.search,
       label: 'Explore',
+      icon: Icons.explore_outlined,
+      activeIcon: Icons.explore,
       route: '/main/explore',
     ),
     NavigationItem(
-      icon: Icons.track_changes_outlined,
-      selectedIcon: Icons.track_changes,
       label: 'Tracker',
+      icon: Icons.assignment_outlined,
+      activeIcon: Icons.assignment,
       route: '/main/tracker',
     ),
     NavigationItem(
-      icon: Icons.people_outline,
-      selectedIcon: Icons.people,
       label: 'Community',
+      icon: Icons.people_outline,
+      activeIcon: Icons.people,
       route: '/main/community',
     ),
     NavigationItem(
-      icon: Icons.person_outline,
-      selectedIcon: Icons.person,
       label: 'Profile',
+      icon: Icons.person_outline,
+      activeIcon: Icons.person,
       route: '/main/profile',
     ),
   ];
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _updateIndexFromRoute();
-  }
-
-  void _updateIndexFromRoute() {
-    final location = GoRouterState.of(context).uri.toString();
-    final index = _navItems.indexWhere((item) => location.contains(item.route));
-    if (index != -1 && index != _currentIndex) {
-      setState(() {
-        _currentIndex = index;
-      });
-    }
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    context.go(_navItems[index].route);
   }
 
   @override
   Widget build(BuildContext context) {
+    // Determine selected index based on current route
+    final location = GoRouterState.of(context).uri.toString();
+    _selectedIndex = _navItems.indexWhere((item) => location.contains(item.route));
+    if (_selectedIndex == -1) _selectedIndex = 0;
+
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -78,53 +76,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
           ],
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(_navItems.length, (index) {
-                final item = _navItems[index];
-                final isSelected = _currentIndex == index;
-
-                return Expanded(
-                  child: InkWell(
-                    onTap: () {
-                      setState(() {
-                        _currentIndex = index;
-                      });
-                      context.go(item.route);
-                    },
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isSelected ? item.selectedIcon : item.icon,
-                          color: isSelected
-                              ? AppTheme.primaryGreen
-                              : AppTheme.mediumGray,
-                          size: 24,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          item.label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.normal,
-                            color: isSelected
-                                ? AppTheme.primaryGreen
-                                : AppTheme.mediumGray,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          selectedItemColor: AppTheme.primaryGreen,
+          unselectedItemColor: AppTheme.mediumGray,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          elevation: 0,
+          items: _navItems.map((item) {
+            return BottomNavigationBarItem(
+              icon: Icon(item.icon),
+              activeIcon: Icon(item.activeIcon),
+              label: item.label,
+            );
+          }).toList(),
         ),
       ),
     );
@@ -132,15 +100,15 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 }
 
 class NavigationItem {
-  final IconData icon;
-  final IconData selectedIcon;
   final String label;
+  final IconData icon;
+  final IconData activeIcon;
   final String route;
 
   NavigationItem({
-    required this.icon,
-    required this.selectedIcon,
     required this.label,
+    required this.icon,
+    required this.activeIcon,
     required this.route,
   });
 }

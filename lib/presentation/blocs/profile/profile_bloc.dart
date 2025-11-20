@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/user_profile.dart';
 
 // Events
@@ -85,7 +87,15 @@ class ProfileError extends ProfileState {
 
 // BLoC
 class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
-  ProfileBloc() : super(ProfileInitial()) {
+  final FirebaseAuth _auth;
+  final FirebaseFirestore _firestore;
+
+  ProfileBloc({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+  })  : _auth = auth ?? FirebaseAuth.instance,
+        _firestore = firestore ?? FirebaseFirestore.instance,
+        super(ProfileInitial()) {
     on<LoadProfile>(_onLoadProfile);
     on<UpdateProfile>(_onUpdateProfile);
     on<AddSkill>(_onAddSkill);
@@ -95,109 +105,175 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   }
 
   Future<void> _onLoadProfile(
-      LoadProfile event,
-      Emitter<ProfileState> emit,
-      ) async {
+    LoadProfile event,
+    Emitter<ProfileState> emit,
+  ) async {
     emit(ProfileLoading());
 
     try {
-      await Future.delayed(const Duration(seconds: 1));
+      final user = _auth.currentUser;
+      
+      if (user == null) {
+        emit(ProfileError('No user logged in'));
+        return;
+      }
 
-      final profile = _getMockProfile();
+      // Get user profile from Firestore
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+
+      if (!userDoc.exists) {
+        emit(ProfileError('Profile not found'));
+        return;
+      }
+
+      final data = userDoc.data()!;
+
+      final profile = UserProfile(
+        id: user.uid,
+        name: data['name'] ?? 'User',
+        email: data['email'] ?? user.email ?? '',
+        avatarUrl: data['avatarUrl'] ?? 'https://i.pravatar.cc/300?u=${user.uid}',
+        role: data['role'] ?? 'volunteer',
+        skills: List<String>.from(data['skills'] ?? []),
+        interests: List<String>.from(data['interests'] ?? []),
+        volunteerHistory: data['volunteerHistory'] != null
+            ? (data['volunteerHistory'] as List)
+                .map((item) => Map<String, String>.from(item as Map))
+                .toList()
+            : [],
+        certificates: List<String>.from(data['certificates'] ?? []),
+        totalHours: data['totalHours'] ?? 0,
+        completedActivities: data['completedActivities'] ?? 0,
+      );
+
       emit(ProfileLoaded(profile));
     } catch (e) {
-      emit(ProfileError('Failed to load profile'));
+      emit(ProfileError('Failed to load profile: ${e.toString()}'));
     }
   }
 
   Future<void> _onUpdateProfile(
-      UpdateProfile event,
-      Emitter<ProfileState> emit,
-      ) async {
-    emit(ProfileLoaded(event.profile));
+    UpdateProfile event,
+    Emitter<ProfileState> emit,
+  ) async {
+    emit(ProfileLoading());
+
+    try {
+      final user = _auth.currentUser;
+      
+      if (user == null) {
+        emit(ProfileError('No user logged in'));
+        return;
+      }
+
+      // Update profile in Firestore
+      await _firestore.collection('users').doc(user.uid).update({
+        'name': event.profile.name,
+        'avatarUrl': event.profile.avatarUrl,
+        'skills': event.profile.skills,
+        'interests': event.profile.interests,
+        'volunteerHistory': event.profile.volunteerHistory,
+        'certificates': event.profile.certificates,
+        'totalHours': event.profile.totalHours,
+        'completedActivities': event.profile.completedActivities,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      emit(ProfileLoaded(event.profile));
+    } catch (e) {
+      emit(ProfileError('Failed to update profile: ${e.toString()}'));
+    }
   }
 
-  Future<void> _onAddSkill(
-      AddSkill event,
-      Emitter<ProfileState> emit,
-      ) async {
+  Future<void> _onAddSkill(AddSkill event, Emitter<ProfileState> emit) async {
     if (state is ProfileLoaded) {
-      final currentProfile = (state as ProfileLoaded).profile;
-      final updatedSkills = List<String>.from(currentProfile.skills)..add(event.skill);
-      emit(ProfileLoaded(currentProfile.copyWith(skills: updatedSkills)));
+      try {
+        final currentProfile = (state as ProfileLoaded).profile;
+        final updatedSkills = List<String>.from(currentProfile.skills)
+          ..add(event.skill);
+
+        // Update in Firestore
+        await _firestore.collection('users').doc(currentProfile.id).update({
+          'skills': updatedSkills,
+        });
+
+        emit(ProfileLoaded(currentProfile.copyWith(skills: updatedSkills)));
+      } catch (e) {
+        emit(ProfileError('Failed to add skill: ${e.toString()}'));
+        // Reload profile to recover
+        add(LoadProfile());
+      }
     }
   }
 
   Future<void> _onRemoveSkill(
-      RemoveSkill event,
-      Emitter<ProfileState> emit,
-      ) async {
+    RemoveSkill event,
+    Emitter<ProfileState> emit,
+  ) async {
     if (state is ProfileLoaded) {
-      final currentProfile = (state as ProfileLoaded).profile;
-      final updatedSkills = List<String>.from(currentProfile.skills)..remove(event.skill);
-      emit(ProfileLoaded(currentProfile.copyWith(skills: updatedSkills)));
+      try {
+        final currentProfile = (state as ProfileLoaded).profile;
+        final updatedSkills = List<String>.from(currentProfile.skills)
+          ..remove(event.skill);
+
+        // Update in Firestore
+        await _firestore.collection('users').doc(currentProfile.id).update({
+          'skills': updatedSkills,
+        });
+
+        emit(ProfileLoaded(currentProfile.copyWith(skills: updatedSkills)));
+      } catch (e) {
+        emit(ProfileError('Failed to remove skill: ${e.toString()}'));
+        add(LoadProfile());
+      }
     }
   }
 
   Future<void> _onAddInterest(
-      AddInterest event,
-      Emitter<ProfileState> emit,
-      ) async {
+    AddInterest event,
+    Emitter<ProfileState> emit,
+  ) async {
     if (state is ProfileLoaded) {
-      final currentProfile = (state as ProfileLoaded).profile;
-      final updatedInterests = List<String>.from(currentProfile.interests)..add(event.interest);
-      emit(ProfileLoaded(currentProfile.copyWith(interests: updatedInterests)));
+      try {
+        final currentProfile = (state as ProfileLoaded).profile;
+        final updatedInterests = List<String>.from(currentProfile.interests)
+          ..add(event.interest);
+
+        // Update in Firestore
+        await _firestore.collection('users').doc(currentProfile.id).update({
+          'interests': updatedInterests,
+        });
+
+        emit(ProfileLoaded(
+            currentProfile.copyWith(interests: updatedInterests)));
+      } catch (e) {
+        emit(ProfileError('Failed to add interest: ${e.toString()}'));
+        add(LoadProfile());
+      }
     }
   }
 
   Future<void> _onRemoveInterest(
-      RemoveInterest event,
-      Emitter<ProfileState> emit,
-      ) async {
+    RemoveInterest event,
+    Emitter<ProfileState> emit,
+  ) async {
     if (state is ProfileLoaded) {
-      final currentProfile = (state as ProfileLoaded).profile;
-      final updatedInterests = List<String>.from(currentProfile.interests)..remove(event.interest);
-      emit(ProfileLoaded(currentProfile.copyWith(interests: updatedInterests)));
-    }
-  }
+      try {
+        final currentProfile = (state as ProfileLoaded).profile;
+        final updatedInterests = List<String>.from(currentProfile.interests)
+          ..remove(event.interest);
 
-  UserProfile _getMockProfile() {
-    return const UserProfile(
-      id: 'user_123',
-      name: 'Aisha Hassan',
-      email: 'aisha.hassan@example.com',
-      avatarUrl: 'https://i.pravatar.cc/300?img=5',
-      role: 'Volunteer',
-      skills: [
-        'Event Planning',
-        'social Media',
-        'First Aid',
-        'Teaching',
-      ],
-      interests: [
-        'Environment',
-        'Education',
-        'Health',
-        'Arts',
-      ],
-      volunteerHistory: [
-        {
-          'title': 'Green Earth Initiative',
-          'subtitle': 'Community Cleanup',
-          'icon': '🌍',
-        },
-        {
-          'title': 'Youth Empowerment Program',
-          'subtitle': 'Tutoring and Skill',
-          'icon': '📚',
-        },
-      ],
-      certificates: [
-        'https://via.placeholder.com/300x200/4A5568/FFFFFF?text=Certificate+1',
-        'https://via.placeholder.com/300x200/4A5568/FFFFFF?text=Certificate+2',
-      ],
-      totalHours: 48,
-      completedActivities: 12,
-    );
+        // Update in Firestore
+        await _firestore.collection('users').doc(currentProfile.id).update({
+          'interests': updatedInterests,
+        });
+
+        emit(ProfileLoaded(
+            currentProfile.copyWith(interests: updatedInterests)));
+      } catch (e) {
+        emit(ProfileError('Failed to remove interest: ${e.toString()}'));
+        add(LoadProfile());
+      }
+    }
   }
 }

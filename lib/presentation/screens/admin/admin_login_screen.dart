@@ -1,36 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/admin_auth/admin_auth_bloc.dart';
 
-class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+class AdminLoginScreen extends StatefulWidget {
+  const AdminLoginScreen({super.key});
 
   @override
-  State<SignupScreen> createState() => _SignupScreenState();
+  State<AdminLoginScreen> createState() => _AdminLoginScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> {
+class _AdminLoginScreenState extends State<AdminLoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: BlocListener<AuthBloc, AuthState>(
+      appBar: AppBar(
+        title: const Text('Admin Login'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/login'),
+        ),
+      ),
+      body: BlocListener<AdminAuthBloc, AdminAuthState>(
         listener: (context, state) {
-          if (state is Authenticated) {
-            context.go(AppRouter.home);
-          } else if (state is AuthError) {
+          if (state is AdminAuthenticated) {
+            context.go('/admin/dashboard');
+          } else if (state is AdminAuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(state.message),
                 backgroundColor: Colors.red,
+                duration: const Duration(seconds: 4),
               ),
             );
           }
@@ -44,41 +50,29 @@ class _SignupScreenState extends State<SignupScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 40),
-                  Text(
-                    'Join Pamoja',
-                    style: Theme.of(context).textTheme.displayMedium,
-                    textAlign: TextAlign.center,
+                  Icon(
+                    Icons.admin_panel_settings,
+                    size: 80,
+                    color: AppTheme.primaryGreen,
                   ),
-                  const SizedBox(height: 80),
+                  const SizedBox(height: 24),
                   Text(
-                    'Small actions, Big change',
-                    style: Theme.of(context).textTheme.headlineMedium,
+                    'Admin Portal',
+                    style: Theme.of(context).textTheme.displayMedium,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Sign up or login to find volunteering opportunities in your community',
+                    'Manage volunteering opportunities',
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 40),
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      hintText: 'Full Name',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 60),
                   TextFormField(
                     controller: _emailController,
                     decoration: const InputDecoration(
-                      hintText: 'Email',
+                      hintText: 'Admin Email',
+                      prefixIcon: Icon(Icons.email_outlined),
                     ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
@@ -96,6 +90,7 @@ class _SignupScreenState extends State<SignupScreen> {
                     controller: _passwordController,
                     decoration: InputDecoration(
                       hintText: 'Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
@@ -115,30 +110,26 @@ class _SignupScreenState extends State<SignupScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your password';
                       }
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
-                      }
                       return null;
                     },
                   ),
                   const SizedBox(height: 32),
-                  BlocBuilder<AuthBloc, AuthState>(
+                  BlocBuilder<AdminAuthBloc, AdminAuthState>(
                     builder: (context, state) {
                       return ElevatedButton(
-                        onPressed: state is AuthLoading
+                        onPressed: state is AdminAuthLoading
                             ? null
                             : () {
                                 if (_formKey.currentState!.validate()) {
-                                  context.read<AuthBloc>().add(
-                                        SignupRequested(
+                                  context.read<AdminAuthBloc>().add(
+                                        AdminLoginRequested(
                                           email: _emailController.text.trim(),
                                           password: _passwordController.text,
-                                          name: _nameController.text.trim(),
                                         ),
                                       );
                                 }
                               },
-                        child: state is AuthLoading
+                        child: state is AdminAuthLoading
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
@@ -147,64 +138,49 @@ class _SignupScreenState extends State<SignupScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Text('Sign Up'),
+                            : const Text('Login as Admin'),
                       );
                     },
                   ),
-                  const SizedBox(height: 32),
-                  Row(
-                    children: [
-                      const Expanded(child: Divider()),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'Or Sign Up with',
-                          style: Theme.of(context).textTheme.bodyMedium,
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightGreen.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.lightGreen),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: AppTheme.primaryGreen,
+                          size: 20,
                         ),
-                      ),
-                      const Expanded(child: Divider()),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      context.read<AuthBloc>().add(GoogleSignInRequested());
-                    },
-                    icon: Image.network(
-                      'https://www.google.com/favicon.ico',
-                      height: 20,
-                      width: 20,
-                    ),
-                    label: const Text('Continue with Google'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: AppTheme.lightGreen),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Already have an account? ',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          context.go(AppRouter.login);
-                        },
-                        child: const Text(
-                          'Log in',
-                          style: TextStyle(
-                            color: AppTheme.primaryGreen,
-                            fontWeight: FontWeight.w600,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Admin access only. Regular users should use the volunteer login.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.darkText,
+                                ),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  TextButton(
+                    onPressed: () {
+                      context.go('/login');
+                    },
+                    child: const Text(
+                      'Back to Volunteer Login',
+                      style: TextStyle(
+                        color: AppTheme.primaryGreen,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
+                    ),
                   ),
                 ],
               ),
@@ -219,7 +195,6 @@ class _SignupScreenState extends State<SignupScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 }

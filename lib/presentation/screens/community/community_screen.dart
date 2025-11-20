@@ -32,7 +32,17 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ),
         ],
       ),
-      body: BlocBuilder<CommunityBloc, CommunityState>(
+      body: BlocConsumer<CommunityBloc, CommunityState>(
+        listener: (context, state) {
+          if (state is CommunityOperationSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppTheme.primaryGreen,
+              ),
+            );
+          }
+        },
         builder: (context, state) {
           if (state is CommunityLoading) {
             return const Center(child: CircularProgressIndicator());
@@ -59,116 +69,116 @@ class _CommunityScreenState extends State<CommunityScreen> {
             );
           }
 
-          if (state is CommunityLoaded) {
-            return RefreshIndicator(
-              onRefresh: () async {
-                context.read<CommunityBloc>().add(LoadPosts());
-              },
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: GestureDetector(
-                        onTap: () => _showCreatePostDialog(context),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppTheme.lightGray),
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 20,
-                                backgroundColor: AppTheme.lightGreen,
-                                backgroundImage: NetworkImage(
-                                  'https://i.pravatar.cc/150?img=1',
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Post an update',
-                                  style: Theme.of(context).textTheme.titleMedium,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Share your volunteering experience',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Recent posts',
-                        style: Theme.of(context).textTheme.headlineMedium,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (state.posts.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(48),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              Icon(Icons.forum_outlined,
-                                  size: 64, color: AppTheme.mediumGray),
-                              const SizedBox(height: 16),
-                              Text(
-                                'No posts yet',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Be the first to share your story!',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ],
-                          ),
-                        ),
-                      )
-                    else
-                      ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: state.posts.length,
-                        itemBuilder: (context, index) {
-                          final post = state.posts[index];
-                          return CommunityPostCard(
-                            post: post,
-                            onLike: () {
-                              context.read<CommunityBloc>().add(
-                                LikePost(post.id),
-                              );
-                            },
-                            onComment: () {
-                              _showCommentDialog(context, post.id);
-                            },
-                          );
-                        },
-                      ),
-                    const SizedBox(height: 24),
-                  ],
-                ),
-              ),
-            );
-          }
+          final posts = state is CommunityLoaded
+              ? state.posts
+              : state is CommunityOperationSuccess
+                  ? state.posts
+                  : [];
 
-          return const SizedBox();
+          return RefreshIndicator(
+            onRefresh: () async {
+              context.read<CommunityBloc>().add(LoadPosts());
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GestureDetector(
+                      onTap: () => _showCreatePostDialog(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.lightGray),
+                        ),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundColor: AppTheme.lightGreen,
+                              child: Icon(
+                                Icons.person,
+                                color: AppTheme.primaryGreen,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Share your volunteering experience...',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: AppTheme.mediumGray,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      'Recent posts',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (posts.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(48),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.forum_outlined,
+                                size: 64, color: AppTheme.mediumGray),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No posts yet',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Be the first to share your story!',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: posts.length,
+                      itemBuilder: (context, index) {
+                        final post = posts[index];
+                        return CommunityPostCard(
+                          post: post,
+                          onLike: () {
+                            context.read<CommunityBloc>().add(
+                                  LikePost(post.id),
+                                );
+                          },
+                          onComment: () {
+                            _showCommentDialog(context, post.id);
+                          },
+                        );
+                      },
+                    ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          );
         },
       ),
     );
@@ -210,16 +220,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 onPressed: () {
                   if (_postController.text.isNotEmpty) {
                     context.read<CommunityBloc>().add(
-                      CreatePost(_postController.text),
-                    );
+                          CreatePost(_postController.text),
+                        );
                     _postController.clear();
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Post created successfully!'),
-                        backgroundColor: AppTheme.primaryGreen,
-                      ),
-                    );
                   }
                 },
                 child: const Text('Post'),
@@ -254,15 +258,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
             onPressed: () {
               if (commentController.text.isNotEmpty) {
                 context.read<CommunityBloc>().add(
-                  CommentOnPost(postId, commentController.text),
-                );
+                      CommentOnPost(postId, commentController.text),
+                    );
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Comment added!'),
-                    backgroundColor: AppTheme.primaryGreen,
-                  ),
-                );
               }
             },
             child: const Text('Comment'),

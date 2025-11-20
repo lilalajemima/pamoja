@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../domain/models/community_post.dart';
 
 // Events
@@ -38,6 +40,15 @@ class CommentOnPost extends CommunityEvent {
   List<Object?> get props => [postId, comment];
 }
 
+class DeletePost extends CommunityEvent {
+  final String postId;
+
+  DeletePost(this.postId);
+
+  @override
+  List<Object?> get props => [postId];
+}
+
 // States
 abstract class CommunityState extends Equatable {
   @override
@@ -66,112 +77,310 @@ class CommunityError extends CommunityState {
   List<Object?> get props => [message];
 }
 
+class CommunityOperationSuccess extends CommunityState {
+  final String message;
+  final List<CommunityPost> posts;
+
+  CommunityOperationSuccess(this.message, this.posts);
+
+  @override
+  List<Object?> get props => [message, posts];
+}
+
 // BLoC
 class CommunityBloc extends Bloc<CommunityEvent, CommunityState> {
-  List<CommunityPost> _posts = [];
+  final FirebaseFirestore _firestore;
+  final FirebaseAuth _auth;
 
-  CommunityBloc() : super(CommunityInitial()) {
+  CommunityBloc({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance,
+        super(CommunityInitial()) {
     on<LoadPosts>(_onLoadPosts);
     on<CreatePost>(_onCreatePost);
     on<LikePost>(_onLikePost);
     on<CommentOnPost>(_onCommentOnPost);
+    on<DeletePost>(_onDeletePost);
   }
 
   Future<void> _onLoadPosts(
-      LoadPosts event,
-      Emitter<CommunityState> emit,
-      ) async {
+    LoadPosts event,
+    Emitter<CommunityState> emit,
+  ) async {
     emit(CommunityLoading());
 
     try {
-      await Future.delayed(const Duration(seconds: 1));
+      final querySnapshot = await _firestore
+          .collection('posts')
+          .orderBy('timestamp', descending: true)
+          .get();
 
-      _posts = _getMockPosts();
-      emit(CommunityLoaded(_posts));
+      final posts = querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        
+        // Handle Firestore Timestamp
+        DateTime timestamp;
+        if (data['timestamp'] is Timestamp) {
+          timestamp = (data['timestamp'] as Timestamp).toDate();
+        } else if (data['timestamp'] is String) {
+          timestamp = DateTime.parse(data['timestamp']);
+        } else {
+          timestamp = DateTime.now();
+        }
+
+        return CommunityPost(
+          id: doc.id,
+          authorName: data['authorName'] ?? 'Anonymous',
+          authorAvatar: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=1',
+          content: data['content'] ?? '',
+          timestamp: timestamp,
+          likes: data['likes'] ?? 0,
+          comments: data['comments'] ?? 0,
+        );
+      }).toList();
+
+      emit(CommunityLoaded(posts));
     } catch (e) {
-      emit(CommunityError('Failed to load posts'));
+      emit(CommunityError('Failed to load posts: ${e.toString()}'));
     }
   }
 
   Future<void> _onCreatePost(
-      CreatePost event,
-      Emitter<CommunityState> emit,
-      ) async {
-    if (state is CommunityLoaded) {
-      final newPost = CommunityPost(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        authorName: 'Current User',
-        authorAvatar: 'https://i.pravatar.cc/150?img=1',
-        content: event.content,
-        timestamp: DateTime.now(),
-        likes: 0,
-        comments: 0,
-      );
+    CreatePost event,
+    Emitter<CommunityState> emit,
+  ) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        emit(CommunityError('You must be logged in to create a post'));
+        return;
+      }
 
-      _posts.insert(0, newPost);
-      emit(CommunityLoaded(List.from(_posts)));
+      // Get user data from Firestore
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      
+      String userName = 'User';
+      String userAvatar = 'https://i.pravatar.cc/150?img=1';
+
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        userName = userData['name'] ?? 'User';
+        userAvatar = userData['avatarUrl'] ?? 'https://i.pravatar.cc/150?img=1';
+      }
+
+      // Create post in Firebase
+      await _firestore.collection('posts').add({
+        'authorId': user.uid,
+        'authorName': userName,
+        'authorAvatar': userAvatar,
+        'content': event.content,
+        'timestamp': FieldValue.serverTimestamp(),
+        'likes': 0,
+        'comments': 0,
+      });
+
+      // Reload posts to show the new one
+      final querySnapshot = await _firestore
+          .collection('posts')
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      final posts = querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        
+        DateTime timestamp;
+        if (data['timestamp'] is Timestamp) {
+          timestamp = (data['timestamp'] as Timestamp).toDate();
+        } else if (data['timestamp'] is String) {
+          timestamp = DateTime.parse(data['timestamp']);
+        } else {
+          timestamp = DateTime.now();
+        }
+
+        return CommunityPost(
+          id: doc.id,
+          authorName: data['authorName'] ?? 'Anonymous',
+          authorAvatar: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=1',
+          content: data['content'] ?? '',
+          timestamp: timestamp,
+          likes: data['likes'] ?? 0,
+          comments: data['comments'] ?? 0,
+        );
+      }).toList();
+
+      emit(CommunityOperationSuccess('Post created successfully!', posts));
+    } catch (e) {
+      emit(CommunityError('Failed to create post: ${e.toString()}'));
     }
   }
 
   Future<void> _onLikePost(
-      LikePost event,
-      Emitter<CommunityState> emit,
-      ) async {
-    if (state is CommunityLoaded) {
-      final index = _posts.indexWhere((p) => p.id == event.postId);
-      if (index != -1) {
-        _posts[index] = _posts[index].copyWith(
-          likes: _posts[index].likes + 1,
+    LikePost event,
+    Emitter<CommunityState> emit,
+  ) async {
+    try {
+      // Update likes count in Firebase
+      await _firestore.collection('posts').doc(event.postId).update({
+        'likes': FieldValue.increment(1),
+      });
+
+      // Reload posts
+      final querySnapshot = await _firestore
+          .collection('posts')
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      final posts = querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        
+        DateTime timestamp;
+        if (data['timestamp'] is Timestamp) {
+          timestamp = (data['timestamp'] as Timestamp).toDate();
+        } else if (data['timestamp'] is String) {
+          timestamp = DateTime.parse(data['timestamp']);
+        } else {
+          timestamp = DateTime.now();
+        }
+
+        return CommunityPost(
+          id: doc.id,
+          authorName: data['authorName'] ?? 'Anonymous',
+          authorAvatar: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=1',
+          content: data['content'] ?? '',
+          timestamp: timestamp,
+          likes: data['likes'] ?? 0,
+          comments: data['comments'] ?? 0,
         );
-        emit(CommunityLoaded(List.from(_posts)));
-      }
+      }).toList();
+
+      emit(CommunityLoaded(posts));
+    } catch (e) {
+      emit(CommunityError('Failed to like post: ${e.toString()}'));
     }
   }
 
   Future<void> _onCommentOnPost(
-      CommentOnPost event,
-      Emitter<CommunityState> emit,
-      ) async {
-    if (state is CommunityLoaded) {
-      final index = _posts.indexWhere((p) => p.id == event.postId);
-      if (index != -1) {
-        _posts[index] = _posts[index].copyWith(
-          comments: _posts[index].comments + 1,
-        );
-        emit(CommunityLoaded(List.from(_posts)));
+    CommentOnPost event,
+    Emitter<CommunityState> emit,
+  ) async {
+    try {
+      // Update comments count in Firebase
+      await _firestore.collection('posts').doc(event.postId).update({
+        'comments': FieldValue.increment(1),
+      });
+
+      // Optionally: Store the actual comment in a subcollection
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _firestore
+            .collection('posts')
+            .doc(event.postId)
+            .collection('commentsList')
+            .add({
+          'userId': user.uid,
+          'comment': event.comment,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
       }
+
+      // Reload posts
+      final querySnapshot = await _firestore
+          .collection('posts')
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      final posts = querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        
+        DateTime timestamp;
+        if (data['timestamp'] is Timestamp) {
+          timestamp = (data['timestamp'] as Timestamp).toDate();
+        } else if (data['timestamp'] is String) {
+          timestamp = DateTime.parse(data['timestamp']);
+        } else {
+          timestamp = DateTime.now();
+        }
+
+        return CommunityPost(
+          id: doc.id,
+          authorName: data['authorName'] ?? 'Anonymous',
+          authorAvatar: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=1',
+          content: data['content'] ?? '',
+          timestamp: timestamp,
+          likes: data['likes'] ?? 0,
+          comments: data['comments'] ?? 0,
+        );
+      }).toList();
+
+      emit(CommunityOperationSuccess('Comment added!', posts));
+    } catch (e) {
+      emit(CommunityError('Failed to add comment: ${e.toString()}'));
     }
   }
 
-  List<CommunityPost> _getMockPosts() {
-    return [
-      CommunityPost(
-        id: '1',
-        authorName: 'Sophia',
-        authorAvatar: 'https://i.pravatar.cc/150?img=5',
-        content: 'Volunteering at the local animal shelter was such a rewarding experience! I got to help care for the animals and meet some amazing people. Highly recommend it to anyone looking to give back.',
-        timestamp: DateTime.now().subtract(const Duration(days: 2)),
-        likes: 23,
-        comments: 5,
-      ),
-      CommunityPost(
-        id: '2',
-        authorName: 'Ethan',
-        authorAvatar: 'https://i.pravatar.cc/150?img=12',
-        content: 'Spent the day helping out at the community garden. It\'s incredible to see the impact we can have when we come together. Plus, fresh veggies are a bonus!',
-        timestamp: DateTime.now().subtract(const Duration(days: 3)),
-        likes: 18,
-        comments: 3,
-      ),
-      CommunityPost(
-        id: '3',
-        authorName: 'Olivia',
-        authorAvatar: 'https://i.pravatar.cc/150?img=9',
-        content: 'Had a blast volunteering at the youth center today! Played games with the kids and helped with their homework. Their smiles made it all worthwhile.',
-        timestamp: DateTime.now().subtract(const Duration(days: 4)),
-        likes: 31,
-        comments: 7,
-      ),
-    ];
+  Future<void> _onDeletePost(
+    DeletePost event,
+    Emitter<CommunityState> emit,
+  ) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        emit(CommunityError('You must be logged in to delete posts'));
+        return;
+      }
+
+      // Check if user owns the post
+      final postDoc = await _firestore.collection('posts').doc(event.postId).get();
+      
+      if (!postDoc.exists) {
+        emit(CommunityError('Post not found'));
+        return;
+      }
+
+      final postData = postDoc.data()!;
+      
+      if (postData['authorId'] != user.uid) {
+        emit(CommunityError('You can only delete your own posts'));
+        return;
+      }
+
+      // Delete the post
+      await _firestore.collection('posts').doc(event.postId).delete();
+
+      // Reload posts
+      final querySnapshot = await _firestore
+          .collection('posts')
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      final posts = querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        
+        DateTime timestamp;
+        if (data['timestamp'] is Timestamp) {
+          timestamp = (data['timestamp'] as Timestamp).toDate();
+        } else if (data['timestamp'] is String) {
+          timestamp = DateTime.parse(data['timestamp']);
+        } else {
+          timestamp = DateTime.now();
+        }
+
+        return CommunityPost(
+          id: doc.id,
+          authorName: data['authorName'] ?? 'Anonymous',
+          authorAvatar: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=1',
+          content: data['content'] ?? '',
+          timestamp: timestamp,
+          likes: data['likes'] ?? 0,
+          comments: data['comments'] ?? 0,
+        );
+      }).toList();
+
+      emit(CommunityOperationSuccess('Post deleted successfully!', posts));
+    } catch (e) {
+      emit(CommunityError('Failed to delete post: ${e.toString()}'));
+    }
   }
 }

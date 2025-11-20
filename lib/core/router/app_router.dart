@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../presentation/screens/onboarding/onboarding_screen.dart';
-import '../../presentation/screens/auth/login_screen.dart';
-import '../../presentation/screens/auth/signup_screen.dart';
-import '../../presentation/screens/main/main_navigation_screen.dart';
-import '../../presentation/screens/home/home_screen.dart';
-import '../../presentation/screens/explore/explore_screen.dart';
-import '../../presentation/screens/explore/opportunity_detail_screen.dart';
-import '../../presentation/screens/tracker/tracker_screen.dart';
-import '../../presentation/screens/community/community_screen.dart';
-import '../../presentation/screens/profile/profile_screen.dart';
-import '../../presentation/screens/profile/settings_screen.dart';
+import '../../../presentation/screens/onboarding/onboarding_screen.dart';
+import '../../../presentation/screens/auth/login_screen.dart';
+import '../../../presentation/screens/auth/signup_screen.dart';
+import '../../../presentation/screens/main/main_navigation_screen.dart';
+import '../../../presentation/screens/home/home_screen.dart';
+import '../../../presentation/screens/explore/explore_screen.dart';
+import '../../../presentation/screens/explore/opportunity_detail_screen.dart';
+import '../../../presentation/screens/tracker/tracker_screen.dart';
+import '../../../presentation/screens/community/community_screen.dart';
+import '../../../presentation/screens/profile/profile_screen.dart';
+import '../../../presentation/screens/profile/settings_screen.dart';
+import '../../../presentation/screens/admin/admin_login_screen.dart';
+import '../../../presentation/screens/admin/admin_dashboard_screen.dart';
+import '../../../presentation/screens/admin/opportunity_form_screen.dart';
+import '../../../domain/models/opportunity.dart';
 
 class AppRouter {
   static const String onboarding = '/';
@@ -24,6 +28,12 @@ class AppRouter {
   static const String profile = '/main/profile';
   static const String opportunityDetail = '/opportunity/:id';
   static const String settings = '/settings';
+  
+  // Admin routes
+  static const String adminLogin = '/admin/login';
+  static const String adminDashboard = '/admin/dashboard';
+  static const String adminCreateOpportunity = '/admin/opportunity/create';
+  static const String adminEditOpportunity = '/admin/opportunity/edit/:id';
 
   static final GoRouter router = GoRouter(
     initialLocation: onboarding,
@@ -40,6 +50,29 @@ class AppRouter {
         path: signup,
         builder: (context, state) => const SignupScreen(),
       ),
+      
+      // Admin routes
+      GoRoute(
+        path: adminLogin,
+        builder: (context, state) => const AdminLoginScreen(),
+      ),
+      GoRoute(
+        path: adminDashboard,
+        builder: (context, state) => const AdminDashboardScreen(),
+      ),
+      GoRoute(
+        path: adminCreateOpportunity,
+        builder: (context, state) => const OpportunityFormScreen(),
+      ),
+      GoRoute(
+        path: adminEditOpportunity,
+        builder: (context, state) {
+          final opportunity = state.extra as Opportunity?;
+          return OpportunityFormScreen(opportunity: opportunity);
+        },
+      ),
+      
+      // Main app routes
       ShellRoute(
         builder: (context, state, child) {
           return MainNavigationScreen(child: child);

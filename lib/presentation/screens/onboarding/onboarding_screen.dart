@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/router/app_router.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -16,19 +16,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final List<OnboardingPage> _pages = [
     OnboardingPage(
-      title: 'Welcome to\nPamoja',
-      description: 'Connecting you to volunteering opportunities in your community.',
-      imageUrl: 'https://images.unsplash.com/photo-1559027615-cd4628902d4a',
+      title: 'Discover Opportunities',
+      description:
+          'Find meaningful volunteering opportunities in your community that match your interests and skills',
+      icon: Icons.explore,
+      color: AppTheme.primaryGreen,
     ),
     OnboardingPage(
-      title: 'Find Your\nPurpose',
-      description: 'Discover meaningful volunteer opportunities that match your interests.',
-      imageUrl: 'https://images.unsplash.com/photo-1593113598332-cd288d649433',
+      title: 'Make an Impact',
+      description:
+          'Connect with organizations and contribute to causes you care about while building valuable experience',
+      icon: Icons.volunteer_activism,
+      color: AppTheme.primaryGreen,
     ),
     OnboardingPage(
-      title: 'Make a\nDifference',
-      description: 'Track your impact and connect with like-minded volunteers.',
-      imageUrl: 'https://images.unsplash.com/photo-1469571486292-0ba58a3f068b',
+      title: 'Track Your Journey',
+      description:
+          'Keep track of your volunteer hours, earn certificates, and share your impact with the community',
+      icon: Icons.emoji_events,
+      color: AppTheme.primaryGreen,
     ),
   ];
 
@@ -60,40 +66,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: List.generate(
                       _pages.length,
-                          (index) => _buildIndicator(index == _currentPage),
+                      (index) => _buildDot(index),
                     ),
                   ),
                   const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (_currentPage == _pages.length - 1) {
-                          context.go(AppRouter.signup);
-                        } else {
-                          _pageController.nextPage(
-                            duration: const Duration(milliseconds: 300),
-                            curve: Curves.easeInOut,
-                          );
-                        }
-                      },
-                      child: Text(
-                        _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (_currentPage < _pages.length - 1)
-                    TextButton(
+                  if (_currentPage == _pages.length - 1)
+                    ElevatedButton(
                       onPressed: () {
                         context.go(AppRouter.signup);
                       },
-                      child: Text(
-                        'Skip',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppTheme.mediumGray,
+                      child: const Text('Get Started'),
+                    )
+                  else
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () {
+                            context.go(AppRouter.signup);
+                          },
+                          child: const Text(
+                            'Skip',
+                            style: TextStyle(color: AppTheme.mediumGray),
+                          ),
                         ),
-                      ),
+                        ElevatedButton(
+                          onPressed: () {
+                            _pageController.nextPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          },
+                          child: const Text('Next'),
+                        ),
+                      ],
                     ),
                 ],
               ),
@@ -106,50 +112,51 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildPage(OnboardingPage page) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(40),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            height: 400,
-            width: double.infinity,
+            width: 200,
+            height: 200,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              image: DecorationImage(
-                image: NetworkImage(page.imageUrl),
-                fit: BoxFit.cover,
-              ),
+              color: page.color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              page.icon,
+              size: 100,
+              color: page.color,
             ),
           ),
           const SizedBox(height: 48),
           Text(
             page.title,
+            style: Theme.of(context).textTheme.displayMedium,
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.displayMedium?.copyWith(
-              height: 1.2,
-              color: AppTheme.darkText,
-            ),
           ),
           const SizedBox(height: 16),
           Text(
             page.description,
-            textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: AppTheme.mediumGray,
-            ),
+                  color: AppTheme.mediumGray,
+                ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildIndicator(bool isActive) {
+  Widget _buildDot(int index) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4),
+      width: _currentPage == index ? 24 : 8,
       height: 8,
-      width: isActive ? 24 : 8,
       decoration: BoxDecoration(
-        color: isActive ? AppTheme.primaryGreen : AppTheme.lightGreen,
+        color: _currentPage == index
+            ? AppTheme.primaryGreen
+            : AppTheme.lightGray,
         borderRadius: BorderRadius.circular(4),
       ),
     );
@@ -165,11 +172,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 class OnboardingPage {
   final String title;
   final String description;
-  final String imageUrl;
+  final IconData icon;
+  final Color color;
 
   OnboardingPage({
     required this.title,
     required this.description,
-    required this.imageUrl,
+    required this.icon,
+    required this.color,
   });
 }

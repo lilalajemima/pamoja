@@ -24,7 +24,7 @@ class OpportunityDetailScreen extends StatelessWidget {
           }
 
           final opportunity = state.opportunities.firstWhere(
-                (o) => o.id == opportunityId,
+            (o) => o.id == opportunityId,
             orElse: () => state.opportunities.first,
           );
 
@@ -79,9 +79,9 @@ class OpportunityDetailScreen extends StatelessWidget {
                         child: Text(
                           opportunity.category,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.primaryGreen,
-                            fontWeight: FontWeight.w600,
-                          ),
+                                color: AppTheme.primaryGreen,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -93,8 +93,8 @@ class OpportunityDetailScreen extends StatelessWidget {
                       Text(
                         opportunity.description,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppTheme.mediumGray,
-                        ),
+                              color: AppTheme.mediumGray,
+                            ),
                       ),
                       const SizedBox(height: 32),
                       Text(
@@ -138,18 +138,63 @@ class OpportunityDetailScreen extends StatelessWidget {
               ),
             ],
           ),
-          child: ElevatedButton(
-            onPressed: () {
-              context.read<TrackerBloc>().add(ApplyToActivity(opportunityId));
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Application submitted successfully!'),
-                  backgroundColor: AppTheme.primaryGreen,
-                ),
-              );
-              context.pop();
+          child: BlocConsumer<TrackerBloc, TrackerState>(
+            listener: (context, state) {
+              if (state is TrackerOperationSuccess) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                    backgroundColor: AppTheme.primaryGreen,
+                  ),
+                );
+                context.pop();
+              } else if (state is TrackerError) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
-            child: const Text('Apply Now'),
+            builder: (context, trackerState) {
+              // Get opportunity data from OpportunitiesBloc
+              final opportunitiesState =
+                  context.read<OpportunitiesBloc>().state;
+
+              if (opportunitiesState is! OpportunitiesLoaded) {
+                return const SizedBox();
+              }
+
+              final opportunity = opportunitiesState.opportunities.firstWhere(
+                (o) => o.id == opportunityId,
+                orElse: () => opportunitiesState.opportunities.first,
+              );
+
+              return ElevatedButton(
+                onPressed: trackerState is TrackerLoading
+                    ? null
+                    : () {
+                        context.read<TrackerBloc>().add(
+                              ApplyToOpportunity(
+                                opportunityId: opportunityId,
+                                opportunityTitle: opportunity.title,
+                                imageUrl: opportunity.imageUrl,
+                              ),
+                            );
+                      },
+                child: trackerState is TrackerLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Apply Now'),
+              );
+            },
           ),
         ),
       ),
@@ -176,8 +221,8 @@ class _DetailRow extends StatelessWidget {
           child: Text(
             label,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: AppTheme.mediumGray,
-            ),
+                  color: AppTheme.mediumGray,
+                ),
           ),
         ),
         Expanded(
@@ -185,8 +230,8 @@ class _DetailRow extends StatelessWidget {
           child: Text(
             value,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ),
       ],

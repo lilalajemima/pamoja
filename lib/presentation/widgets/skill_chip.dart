@@ -13,38 +13,22 @@ class SkillChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: onDelete != null ? 12 : 16,
-        vertical: 10,
-      ),
-      decoration: BoxDecoration(
-        color: AppTheme.lightGreen,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppTheme.darkText,
-              fontWeight: FontWeight.w500,
-            ),
+    return Chip(
+      label: Text(label),
+      labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: AppTheme.darkText,
+            fontWeight: FontWeight.w500,
           ),
-          if (onDelete != null) ...[
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: onDelete,
-              child: const Icon(
-                Icons.close,
-                size: 16,
-                color: AppTheme.mediumGray,
-              ),
-            ),
-          ],
-        ],
-      ),
+      backgroundColor: AppTheme.lightGreen,
+      deleteIcon: onDelete != null
+          ? Icon(
+              Icons.close,
+              size: 18,
+              color: AppTheme.darkText,
+            )
+          : null,
+      onDeleted: onDelete,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     );
   }
 }
