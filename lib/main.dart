@@ -11,6 +11,7 @@ import 'presentation/blocs/opportunities/opportunities_bloc.dart';
 import 'presentation/blocs/tracker/tracker_bloc.dart';
 import 'presentation/blocs/community/community_bloc.dart';
 import 'presentation/blocs/profile/profile_bloc.dart';
+import 'presentation/blocs/theme/theme_cubit.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,46 +31,26 @@ class PamojaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        // Volunteer Authentication (Firebase)
-        BlocProvider(
-          create: (context) => AuthBloc(),
-        ),
-        
-        // Admin Authentication (Firebase)
-        BlocProvider(
-          create: (context) => AdminAuthBloc(),
-        ),
-        
-        // Admin Opportunities Management (Firebase CRUD)
-        BlocProvider(
-          create: (context) => AdminOpportunitiesBloc(),
-        ),
-        
-        // Volunteer Opportunities (Firebase Read)
-        BlocProvider(
-          create: (context) => OpportunitiesBloc(),
-        ),
-        
-        // Volunteer Activity Tracker (Firebase)
-        BlocProvider(
-          create: (context) => TrackerBloc(),
-        ),
-        
-        // Community Posts (Firebase CRUD)
-        BlocProvider(
-          create: (context) => CommunityBloc(),
-        ),
-        
-        // User Profile (Firebase)
-        BlocProvider(
-          create: (context) => ProfileBloc(),
-        ),
+        BlocProvider(create: (context) => ThemeCubit()),
+        BlocProvider(create: (context) => AuthBloc()),
+        BlocProvider(create: (context) => AdminAuthBloc()),
+        BlocProvider(create: (context) => AdminOpportunitiesBloc()),
+        BlocProvider(create: (context) => OpportunitiesBloc()),
+        BlocProvider(create: (context) => TrackerBloc()),
+        BlocProvider(create: (context) => CommunityBloc()),
+        BlocProvider(create: (context) => ProfileBloc()),
       ],
-      child: MaterialApp.router(
-        title: 'Pamoja - Volunteering Made Easy',
-        theme: AppTheme.lightTheme,
-        routerConfig: AppRouter.router,
-        debugShowCheckedModeBanner: false,
+      child: BlocBuilder<ThemeCubit, bool>(
+        builder: (context, isDarkMode) {
+          return MaterialApp.router(
+            title: 'Pamoja - Volunteering Made Easy',
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: isDarkMode ? ThemeMode.dark : ThemeMode.light,
+            routerConfig: AppRouter.router,
+            debugShowCheckedModeBanner: false,
+          );
+        },
       ),
     );
   }

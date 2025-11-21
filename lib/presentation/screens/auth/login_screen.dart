@@ -130,29 +130,32 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 24),
                   BlocBuilder<AuthBloc, AuthState>(
                     builder: (context, state) {
-                      return ElevatedButton(
-                        onPressed: state is AuthLoading
-                            ? null
-                            : () {
-                                if (_formKey.currentState!.validate()) {
-                                  context.read<AuthBloc>().add(
-                                        LoginRequested(
-                                          email: _emailController.text.trim(),
-                                          password: _passwordController.text,
-                                        ),
-                                      );
-                                }
-                              },
-                        child: state is AuthLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Text('Login'),
+                      return SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: state is AuthLoading
+                              ? null
+                              : () {
+                                  if (_formKey.currentState!.validate()) {
+                                    context.read<AuthBloc>().add(
+                                          LoginRequested(
+                                            email: _emailController.text.trim(),
+                                            password: _passwordController.text,
+                                          ),
+                                        );
+                                  }
+                                },
+                          child: state is AuthLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Login'),
+                        ),
                       );
                     },
                   ),

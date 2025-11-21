@@ -21,6 +21,16 @@ class CreatePost extends CommunityEvent {
   List<Object?> get props => [content];
 }
 
+class EditPost extends CommunityEvent {
+  final String postId;
+  final String newContent;
+
+  EditPost(this.postId, this.newContent);
+
+  @override
+  List<Object?> get props => [postId, newContent];
+}
+
 class LikePost extends CommunityEvent {
   final String postId;
 
@@ -100,6 +110,7 @@ class CommunityBloc extends Bloc<CommunityEvent, CommunityState> {
         super(CommunityInitial()) {
     on<LoadPosts>(_onLoadPosts);
     on<CreatePost>(_onCreatePost);
+    on<EditPost>(_onEditPost);
     on<LikePost>(_onLikePost);
     on<CommentOnPost>(_onCommentOnPost);
     on<DeletePost>(_onDeletePost);
@@ -182,37 +193,48 @@ class CommunityBloc extends Bloc<CommunityEvent, CommunityState> {
       });
 
       // Reload posts to show the new one
-      final querySnapshot = await _firestore
-          .collection('posts')
-          .orderBy('timestamp', descending: true)
-          .get();
-
-      final posts = querySnapshot.docs.map((doc) {
-        final data = doc.data();
-        
-        DateTime timestamp;
-        if (data['timestamp'] is Timestamp) {
-          timestamp = (data['timestamp'] as Timestamp).toDate();
-        } else if (data['timestamp'] is String) {
-          timestamp = DateTime.parse(data['timestamp']);
-        } else {
-          timestamp = DateTime.now();
-        }
-
-        return CommunityPost(
-          id: doc.id,
-          authorName: data['authorName'] ?? 'Anonymous',
-          authorAvatar: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=1',
-          content: data['content'] ?? '',
-          timestamp: timestamp,
-          likes: data['likes'] ?? 0,
-          comments: data['comments'] ?? 0,
-        );
-      }).toList();
-
-      emit(CommunityOperationSuccess('Post created successfully!', posts));
+      await _reloadPosts(emit, 'Post created successfully!');
     } catch (e) {
       emit(CommunityError('Failed to create post: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onEditPost(
+    EditPost event,
+    Emitter<CommunityState> emit,
+  ) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        emit(CommunityError('You must be logged in to edit posts'));
+        return;
+      }
+
+      // Check if user owns the post
+      final postDoc = await _firestore.collection('posts').doc(event.postId).get();
+      
+      if (!postDoc.exists) {
+        emit(CommunityError('Post not found'));
+        return;
+      }
+
+      final postData = postDoc.data()!;
+      
+      if (postData['authorId'] != user.uid) {
+        emit(CommunityError('You can only edit your own posts'));
+        return;
+      }
+
+      // Update the post
+      await _firestore.collection('posts').doc(event.postId).update({
+        'content': event.newContent,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Reload posts
+      await _reloadPosts(emit, 'Post updated successfully!');
+    } catch (e) {
+      emit(CommunityError('Failed to edit post: ${e.toString()}'));
     }
   }
 
@@ -227,35 +249,7 @@ class CommunityBloc extends Bloc<CommunityEvent, CommunityState> {
       });
 
       // Reload posts
-      final querySnapshot = await _firestore
-          .collection('posts')
-          .orderBy('timestamp', descending: true)
-          .get();
-
-      final posts = querySnapshot.docs.map((doc) {
-        final data = doc.data();
-        
-        DateTime timestamp;
-        if (data['timestamp'] is Timestamp) {
-          timestamp = (data['timestamp'] as Timestamp).toDate();
-        } else if (data['timestamp'] is String) {
-          timestamp = DateTime.parse(data['timestamp']);
-        } else {
-          timestamp = DateTime.now();
-        }
-
-        return CommunityPost(
-          id: doc.id,
-          authorName: data['authorName'] ?? 'Anonymous',
-          authorAvatar: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=1',
-          content: data['content'] ?? '',
-          timestamp: timestamp,
-          likes: data['likes'] ?? 0,
-          comments: data['comments'] ?? 0,
-        );
-      }).toList();
-
-      emit(CommunityLoaded(posts));
+      await _reloadPosts(emit, null);
     } catch (e) {
       emit(CommunityError('Failed to like post: ${e.toString()}'));
     }
@@ -286,35 +280,7 @@ class CommunityBloc extends Bloc<CommunityEvent, CommunityState> {
       }
 
       // Reload posts
-      final querySnapshot = await _firestore
-          .collection('posts')
-          .orderBy('timestamp', descending: true)
-          .get();
-
-      final posts = querySnapshot.docs.map((doc) {
-        final data = doc.data();
-        
-        DateTime timestamp;
-        if (data['timestamp'] is Timestamp) {
-          timestamp = (data['timestamp'] as Timestamp).toDate();
-        } else if (data['timestamp'] is String) {
-          timestamp = DateTime.parse(data['timestamp']);
-        } else {
-          timestamp = DateTime.now();
-        }
-
-        return CommunityPost(
-          id: doc.id,
-          authorName: data['authorName'] ?? 'Anonymous',
-          authorAvatar: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=1',
-          content: data['content'] ?? '',
-          timestamp: timestamp,
-          likes: data['likes'] ?? 0,
-          comments: data['comments'] ?? 0,
-        );
-      }).toList();
-
-      emit(CommunityOperationSuccess('Comment added!', posts));
+      await _reloadPosts(emit, 'Comment added!');
     } catch (e) {
       emit(CommunityError('Failed to add comment: ${e.toString()}'));
     }
@@ -350,37 +316,45 @@ class CommunityBloc extends Bloc<CommunityEvent, CommunityState> {
       await _firestore.collection('posts').doc(event.postId).delete();
 
       // Reload posts
-      final querySnapshot = await _firestore
-          .collection('posts')
-          .orderBy('timestamp', descending: true)
-          .get();
-
-      final posts = querySnapshot.docs.map((doc) {
-        final data = doc.data();
-        
-        DateTime timestamp;
-        if (data['timestamp'] is Timestamp) {
-          timestamp = (data['timestamp'] as Timestamp).toDate();
-        } else if (data['timestamp'] is String) {
-          timestamp = DateTime.parse(data['timestamp']);
-        } else {
-          timestamp = DateTime.now();
-        }
-
-        return CommunityPost(
-          id: doc.id,
-          authorName: data['authorName'] ?? 'Anonymous',
-          authorAvatar: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=1',
-          content: data['content'] ?? '',
-          timestamp: timestamp,
-          likes: data['likes'] ?? 0,
-          comments: data['comments'] ?? 0,
-        );
-      }).toList();
-
-      emit(CommunityOperationSuccess('Post deleted successfully!', posts));
+      await _reloadPosts(emit, 'Post deleted successfully!');
     } catch (e) {
       emit(CommunityError('Failed to delete post: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _reloadPosts(Emitter<CommunityState> emit, String? message) async {
+    final querySnapshot = await _firestore
+        .collection('posts')
+        .orderBy('timestamp', descending: true)
+        .get();
+
+    final posts = querySnapshot.docs.map((doc) {
+      final data = doc.data();
+      
+      DateTime timestamp;
+      if (data['timestamp'] is Timestamp) {
+        timestamp = (data['timestamp'] as Timestamp).toDate();
+      } else if (data['timestamp'] is String) {
+        timestamp = DateTime.parse(data['timestamp']);
+      } else {
+        timestamp = DateTime.now();
+      }
+
+      return CommunityPost(
+        id: doc.id,
+        authorName: data['authorName'] ?? 'Anonymous',
+        authorAvatar: data['authorAvatar'] ?? 'https://i.pravatar.cc/150?img=1',
+        content: data['content'] ?? '',
+        timestamp: timestamp,
+        likes: data['likes'] ?? 0,
+        comments: data['comments'] ?? 0,
+      );
+    }).toList();
+
+    if (message != null) {
+      emit(CommunityOperationSuccess(message, posts));
+    } else {
+      emit(CommunityLoaded(posts));
     }
   }
 }
