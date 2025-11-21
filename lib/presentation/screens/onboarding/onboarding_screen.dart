@@ -70,16 +70,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
+                  // FIXED: Changed this section to use Column instead of nested Rows
                   if (_currentPage == _pages.length - 1)
-                    ElevatedButton(
-                      onPressed: () {
-                        context.go(AppRouter.signup);
-                      },
-                      child: const Text('Get Started'),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          context.go(AppRouter.signup);
+                        },
+                        child: const Text('Get Started'),
+                      ),
                     )
                   else
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         TextButton(
                           onPressed: () {
@@ -90,6 +93,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             style: TextStyle(color: AppTheme.mediumGray),
                           ),
                         ),
+                        const Spacer(),
                         ElevatedButton(
                           onPressed: () {
                             _pageController.nextPage(

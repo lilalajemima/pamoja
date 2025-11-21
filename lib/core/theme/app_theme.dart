@@ -70,11 +70,12 @@ class AppTheme {
         ),
       ),
 
+      // FIXED: Removed double.infinity from minimumSize
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: primaryGreen,
           foregroundColor: white,
-          minimumSize: const Size(double.infinity, 56),
+          minimumSize: const Size(0, 56), // Changed from (double.infinity, 56)
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),
           ),

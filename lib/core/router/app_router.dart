@@ -20,7 +20,6 @@ class AppRouter {
   static const String onboarding = '/';
   static const String login = '/login';
   static const String signup = '/signup';
-  static const String main = '/main';
   static const String home = '/main/home';
   static const String explore = '/main/explore';
   static const String tracker = '/main/tracker';
@@ -37,79 +36,105 @@ class AppRouter {
 
   static final GoRouter router = GoRouter(
     initialLocation: onboarding,
+    debugLogDiagnostics: true,
+    errorBuilder: (context, state) => Scaffold(
+      body: Center(
+        child: Text('Error: ${state.error}'),
+      ),
+    ),
     routes: [
+      // Onboarding & Auth
       GoRoute(
-        path: onboarding,
+        path: '/',
         builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
-        path: login,
+        path: '/login',
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
-        path: signup,
+        path: '/signup',
         builder: (context, state) => const SignupScreen(),
       ),
       
-      // Admin routes
+      // Admin Routes
       GoRoute(
-        path: adminLogin,
+        path: '/admin/login',
         builder: (context, state) => const AdminLoginScreen(),
       ),
       GoRoute(
-        path: adminDashboard,
+        path: '/admin/dashboard',
         builder: (context, state) => const AdminDashboardScreen(),
       ),
       GoRoute(
-        path: adminCreateOpportunity,
+        path: '/admin/opportunity/create',
         builder: (context, state) => const OpportunityFormScreen(),
       ),
       GoRoute(
-        path: adminEditOpportunity,
+        path: '/admin/opportunity/edit/:id',
         builder: (context, state) {
           final opportunity = state.extra as Opportunity?;
           return OpportunityFormScreen(opportunity: opportunity);
         },
       ),
       
-      // Main app routes
+      // Settings (outside main nav)
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      
+      // Opportunity Detail (outside main nav)
+      GoRoute(
+        path: '/opportunity/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return OpportunityDetailScreen(opportunityId: id);
+        },
+      ),
+      
+      // Main App Routes with Bottom Navigation
       ShellRoute(
         builder: (context, state, child) {
           return MainNavigationScreen(child: child);
         },
         routes: [
           GoRoute(
-            path: home,
-            builder: (context, state) => const HomeScreen(),
+            path: '/main/home',
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const HomeScreen(),
+            ),
           ),
           GoRoute(
-            path: explore,
-            builder: (context, state) => const ExploreScreen(),
+            path: '/main/explore',
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const ExploreScreen(),
+            ),
           ),
           GoRoute(
-            path: tracker,
-            builder: (context, state) => const TrackerScreen(),
+            path: '/main/tracker',
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const TrackerScreen(),
+            ),
           ),
           GoRoute(
-            path: community,
-            builder: (context, state) => const CommunityScreen(),
+            path: '/main/community',
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const CommunityScreen(),
+            ),
           ),
           GoRoute(
-            path: profile,
-            builder: (context, state) => const ProfileScreen(),
+            path: '/main/profile',
+            pageBuilder: (context, state) => NoTransitionPage(
+              key: state.pageKey,
+              child: const ProfileScreen(),
+            ),
           ),
         ],
-      ),
-      GoRoute(
-        path: opportunityDetail,
-        builder: (context, state) {
-          final id = state.pathParameters['id']!;
-          return OpportunityDetailScreen(opportunityId: id);
-        },
-      ),
-      GoRoute(
-        path: settings,
-        builder: (context, state) => const SettingsScreen(),
       ),
     ],
   );
