@@ -95,9 +95,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: Theme.of(context).cardColor,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppTheme.lightGray),
+                          border: Border.all(
+                            color: Theme.of(context).dividerColor,
+                          ),
                         ),
                         child: Row(
                           children: [
@@ -166,32 +168,41 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         itemCount: posts.length,
                         itemBuilder: (context, index) {
                           final post = posts[index];
-                          final currentUser = FirebaseAuth.instance.currentUser;
-                          final isOwnPost = currentUser != null && 
-                              post.authorName == (currentUser.displayName ?? 'User');
+                          return FutureBuilder<DocumentSnapshot>(
+                            future: _getPostAuthorId(post.authorName),
+                            builder: (context, snapshot) {
+                              final currentUser = FirebaseAuth.instance.currentUser;
+                              final authorId = snapshot.data?.id;
+                              final isOwnPost = currentUser != null && 
+                                  (authorId == currentUser.uid ||
+                                   post.authorName == (currentUser.displayName ?? 'User'));
 
-                          return _PostCard(
-                            post: post,
-                            isOwnPost: isOwnPost,
-                            onLike: () {
-                              context.read<CommunityBloc>().add(
-                                    LikePost(post.id),
-                                  );
-                            },
-                            onComment: () {
-                              _showCommentDialog(context, post.id);
-                            },
-                            onViewComments: () {
-                              _showCommentsSheet(context, post.id);
-                            },
-                            onEdit: isOwnPost ? () {
-                              _showEditPostDialog(context, post.id, post.content);
-                            } : null,
-                            onDelete: isOwnPost ? () {
-                              _showDeleteConfirmation(context, post.id);
-                            } : null,
-                            onProfileTap: () {
-                              _showUserProfile(context, post.authorName);
+                              return _PostCard(
+                                post: post,
+                                isOwnPost: isOwnPost,
+                                onLike: () {
+                                  context.read<CommunityBloc>().add(
+                                        LikePost(post.id),
+                                      );
+                                },
+                                onComment: () {
+                                  _showCommentDialog(context, post.id);
+                                },
+                                onViewComments: () {
+                                  _showCommentsSheet(context, post.id);
+                                },
+                                onEdit: isOwnPost ? () {
+                                  _showEditPostDialog(context, post.id, post.content);
+                                } : null,
+                                onDelete: isOwnPost ? () {
+                                  _showDeleteConfirmation(context, post.id);
+                                } : null,
+                                onProfileTap: () {
+                                  if (authorId != null) {
+                                    _showUserProfile(context, post.authorName, authorId);
+                                  }
+                                },
+                              );
                             },
                           );
                         },
@@ -207,48 +218,260 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  void _showUserProfile(BuildContext context, String userName) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('$userName\'s Profile'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundColor: AppTheme.lightGreen,
-              child: Text(
-                userName[0].toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 32,
-                  color: AppTheme.primaryGreen,
-                  fontWeight: FontWeight.bold,
+  Future<DocumentSnapshot?> _getPostAuthorId(String authorName) async {
+    try {
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('name', isEqualTo: authorName)
+          .limit(1)
+          .get();
+      
+      if (querySnapshot.docs.isNotEmpty) {
+        return querySnapshot.docs.first;
+      }
+    } catch (e) {
+      print('Error getting author ID: $e');
+    }
+    return null;
+  }
+
+  void _showUserProfile(BuildContext context, String authorName, String authorId) async {
+    try {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(authorId)
+          .get();
+
+      if (!mounted) return;
+
+      if (!userDoc.exists) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User profile not found')),
+        );
+        return;
+      }
+
+      final userData = userDoc.data()!;
+      
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => DraggableScrollableSheet(
+          initialChildSize: 0.8,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) => Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.mediumGray,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundColor: AppTheme.lightGreen,
+                          backgroundImage: userData['avatarUrl'] != null
+                              ? CachedNetworkImageProvider(userData['avatarUrl'])
+                              : null,
+                          child: userData['avatarUrl'] == null
+                              ? Text(
+                                  authorName[0].toUpperCase(),
+                                  style: const TextStyle(
+                                    fontSize: 32,
+                                    color: AppTheme.primaryGreen,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          userData['name'] ?? authorName,
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          userData['role'] ?? 'Volunteer',
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: AppTheme.primaryGreen,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        
+                        // Skills
+                        if (userData['skills'] != null && (userData['skills'] as List).isNotEmpty) ...[
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Skills',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: (userData['skills'] as List).map((skill) {
+                              return Chip(
+                                label: Text(skill.toString()),
+                                backgroundColor: AppTheme.lightGreen,
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                        
+                        // Interests
+                        if (userData['interests'] != null && (userData['interests'] as List).isNotEmpty) ...[
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Interests',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: (userData['interests'] as List).map((interest) {
+                              return Chip(
+                                label: Text(interest.toString()),
+                                backgroundColor: AppTheme.lightGreen,
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 24),
+                        ],
+                        
+                        // Volunteer History
+                        if (userData['volunteerHistory'] != null && (userData['volunteerHistory'] as List).isNotEmpty) ...[
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Volunteering History',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ...(userData['volunteerHistory'] as List).map((history) {
+                            final historyMap = history as Map<String, dynamic>;
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).cardColor,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Theme.of(context).dividerColor,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.lightGreen,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        historyMap['icon'] ?? '🌟',
+                                        style: const TextStyle(fontSize: 24),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          historyMap['title'] ?? '',
+                                          style: Theme.of(context).textTheme.titleMedium,
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          historyMap['subtitle'] ?? '',
+                                          style: Theme.of(context).textTheme.bodyMedium,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          const SizedBox(height: 24),
+                        ],
+                        
+                        // Certificates
+                        if (userData['certificates'] != null && (userData['certificates'] as List).isNotEmpty) ...[
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Certificates',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 200,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: (userData['certificates'] as List).length,
+                              itemBuilder: (context, index) {
+                                return Container(
+                                  width: 280,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    image: DecorationImage(
+                                      image: NetworkImage(
+                                        userData['certificates'][index].toString(),
+                                      ),
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(
-              userName,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Volunteer',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: AppTheme.primaryGreen,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
           ),
-        ],
-      ),
-    );
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading profile: ${e.toString()}')),
+        );
+      }
+    }
   }
 
   void _showCommentsSheet(BuildContext context, String postId) {
@@ -261,9 +484,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
         minChildSize: 0.5,
         maxChildSize: 0.95,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [
@@ -345,7 +568,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.05),
@@ -404,9 +627,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -460,9 +683,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
           bottom: MediaQuery.of(context).viewInsets.bottom,
         ),
         child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -636,9 +859,9 @@ class _PostCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.lightGray),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

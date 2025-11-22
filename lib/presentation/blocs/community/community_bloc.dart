@@ -172,18 +172,18 @@ class CommunityBloc extends Bloc<CommunityEvent, CommunityState> {
       // Get user data from Firestore
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       
-      String userName = 'User';
+      String userName = user.displayName ?? 'User';
       String userAvatar = 'https://i.pravatar.cc/150?img=1';
 
       if (userDoc.exists) {
         final userData = userDoc.data()!;
-        userName = userData['name'] ?? 'User';
+        userName = userData['name'] ?? user.displayName ?? 'User';
         userAvatar = userData['avatarUrl'] ?? 'https://i.pravatar.cc/150?img=1';
       }
 
-      // Create post in Firebase
+      // Create post in Firebase - IMPORTANT: Store authorId
       await _firestore.collection('posts').add({
-        'authorId': user.uid,
+        'authorId': user.uid, // Store the user ID
         'authorName': userName,
         'authorAvatar': userAvatar,
         'content': event.content,
@@ -265,15 +265,25 @@ class CommunityBloc extends Bloc<CommunityEvent, CommunityState> {
         'comments': FieldValue.increment(1),
       });
 
-      // Optionally: Store the actual comment in a subcollection
+      // Store the actual comment in a subcollection
       final user = _auth.currentUser;
       if (user != null) {
+        // Get user data
+        final userDoc = await _firestore.collection('users').doc(user.uid).get();
+        String userName = user.displayName ?? 'User';
+        
+        if (userDoc.exists) {
+          final userData = userDoc.data()!;
+          userName = userData['name'] ?? user.displayName ?? 'User';
+        }
+
         await _firestore
             .collection('posts')
             .doc(event.postId)
             .collection('commentsList')
             .add({
           'userId': user.uid,
+          'userName': userName,
           'comment': event.comment,
           'timestamp': FieldValue.serverTimestamp(),
         });
