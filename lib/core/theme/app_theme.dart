@@ -297,7 +297,7 @@ class AppTheme {
       ),
 
       cardColor: darkCard,
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: darkCard,
         elevation: 0,
         shape: RoundedRectangleBorder(

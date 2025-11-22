@@ -168,7 +168,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         itemCount: posts.length,
                         itemBuilder: (context, index) {
                           final post = posts[index];
-                          return FutureBuilder<DocumentSnapshot>(
+                          return FutureBuilder<DocumentSnapshot?>(
                             future: _getPostAuthorId(post.authorName),
                             builder: (context, snapshot) {
                               final currentUser = FirebaseAuth.instance.currentUser;
