@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../blocs/admin_auth/admin_auth_bloc.dart';
 import '../../blocs/admin_opportunities/admin_opportunities_bloc.dart';
+import 'admin_applications_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -14,6 +15,8 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
+  int _selectedIndex = 0;
+
   @override
   void initState() {
     super.initState();
@@ -24,12 +27,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Dashboard'),
+        title: Text(_selectedIndex == 0 ? 'Opportunities' : 'Applications'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
-              context.read<AdminOpportunitiesBloc>().add(LoadAdminOpportunities());
+              if (_selectedIndex == 0) {
+                context.read<AdminOpportunitiesBloc>().add(LoadAdminOpportunities());
+              }
             },
           ),
           IconButton(
@@ -38,212 +43,236 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ],
       ),
-      body: BlocConsumer<AdminOpportunitiesBloc, AdminOpportunitiesState>(
-        listener: (context, state) {
-          if (state is AdminOpportunityOperationSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppTheme.primaryGreen,
-              ),
-            );
-          } else if (state is AdminOpportunitiesError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
+      body: _selectedIndex == 0 ? _buildOpportunitiesTab() : const AdminApplicationsScreen(),
+      floatingActionButton: _selectedIndex == 0
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                context.push('/admin/opportunity/create');
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('New Opportunity'),
+              backgroundColor: AppTheme.primaryGreen,
+            )
+          : null,
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          setState(() {
+            _selectedIndex = index;
+          });
         },
-        builder: (context, state) {
-          if (state is AdminOpportunitiesLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.inventory_2_outlined),
+            label: 'Opportunities',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.assignment_outlined),
+            label: 'Applications',
+          ),
+        ],
+      ),
+    );
+  }
 
-          if (state is AdminOpportunitiesError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildOpportunitiesTab() {
+    return BlocConsumer<AdminOpportunitiesBloc, AdminOpportunitiesState>(
+      listener: (context, state) {
+        if (state is AdminOpportunityOperationSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: AppTheme.primaryGreen,
+            ),
+          );
+        } else if (state is AdminOpportunitiesError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is AdminOpportunitiesLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (state is AdminOpportunitiesError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: AppTheme.mediumGray),
+                const SizedBox(height: 16),
+                Text(state.message),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    context.read<AdminOpportunitiesBloc>().add(LoadAdminOpportunities());
+                  },
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final opportunities = state is AdminOpportunitiesLoaded
+            ? state.opportunities
+            : state is AdminOpportunityOperationSuccess
+                ? state.opportunities
+                : [];
+
+        return Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: AppTheme.lightGreen.withOpacity(0.3),
+              child: Row(
                 children: [
-                  Icon(Icons.error_outline, size: 64, color: AppTheme.mediumGray),
-                  const SizedBox(height: 16),
-                  Text(state.message),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      context.read<AdminOpportunitiesBloc>().add(LoadAdminOpportunities());
-                    },
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final opportunities = state is AdminOpportunitiesLoaded
-              ? state.opportunities
-              : state is AdminOpportunityOperationSuccess
-                  ? state.opportunities
-                  : [];
-
-          return Column(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                color: AppTheme.lightGreen.withOpacity(0.3),
-                child: Row(
-                  children: [
-                    Icon(Icons.inventory_2_outlined, color: AppTheme.primaryGreen),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Total Opportunities',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          Text(
-                            '${opportunities.length}',
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                  color: AppTheme.primaryGreen,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Text(
-                      'Manage Opportunities',
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                  ],
-                ),
-              ),
-              if (opportunities.isEmpty)
-                Expanded(
-                  child: Center(
+                  Icon(Icons.inventory_2_outlined, color: AppTheme.primaryGreen),
+                  const SizedBox(width: 12),
+                  Expanded(
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.inventory_outlined, size: 64, color: AppTheme.mediumGray),
-                        const SizedBox(height: 16),
                         Text(
-                          'No opportunities yet',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Tap the + button to create one',
+                          'Total Opportunities',
                           style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        Text(
+                          '${opportunities.length}',
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: AppTheme.primaryGreen,
+                              ),
                         ),
                       ],
                     ),
                   ),
-                )
-              else
-                Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: opportunities.length,
-                    itemBuilder: (context, index) {
-                      final opportunity = opportunities[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(12),
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: CachedNetworkImage(
-                              imageUrl: opportunity.imageUrl,
-                              width: 60,
-                              height: 60,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => Container(
-                                width: 60,
-                                height: 60,
-                                color: AppTheme.lightGray,
-                                child: const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                width: 60,
-                                height: 60,
-                                color: AppTheme.lightGray,
-                                child: const Icon(Icons.image_not_supported),
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            opportunity.title,
-                            style: Theme.of(context).textTheme.titleMedium,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text(
-                                opportunity.category,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: AppTheme.primaryGreen,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                opportunity.location,
-                                style: Theme.of(context).textTheme.bodySmall,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.blue),
-                                onPressed: () {
-                                  context.push('/admin/opportunity/edit/${opportunity.id}', extra: opportunity);
-                                },
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _showDeleteDialog(context, opportunity.id, opportunity.title),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Text(
+                    'Manage Opportunities',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ],
+              ),
+            ),
+            if (opportunities.isEmpty)
+              Expanded(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.inventory_outlined, size: 64, color: AppTheme.mediumGray),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No opportunities yet',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Tap the + button to create one',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
                   ),
                 ),
-            ],
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          context.push('/admin/opportunity/create');
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New Opportunity'),
-        backgroundColor: AppTheme.primaryGreen,
-      ),
+              )
+            else
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: opportunities.length,
+                  itemBuilder: (context, index) {
+                    final opportunity = opportunities[index];
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(12),
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: CachedNetworkImage(
+                            imageUrl: opportunity.imageUrl,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              width: 60,
+                              height: 60,
+                              color: AppTheme.lightGray,
+                              child: const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              width: 60,
+                              height: 60,
+                              color: AppTheme.lightGray,
+                              child: const Icon(Icons.image_not_supported),
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          opportunity.title,
+                          style: Theme.of(context).textTheme.titleMedium,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(
+                              opportunity.category,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppTheme.primaryGreen,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              opportunity.location,
+                              style: Theme.of(context).textTheme.bodySmall,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              onPressed: () {
+                                context.push('/admin/opportunity/edit/${opportunity.id}', extra: opportunity);
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _showDeleteDialog(context, opportunity.id, opportunity.title),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 

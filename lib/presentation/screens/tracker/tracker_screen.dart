@@ -44,7 +44,17 @@ class _TrackerScreenState extends State<TrackerScreen> {
           ),
         ],
       ),
-      body: BlocBuilder<TrackerBloc, TrackerState>(
+      body: BlocConsumer<TrackerBloc, TrackerState>(
+        listener: (context, state) {
+          if (state is TrackerOperationSuccess) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: AppTheme.primaryGreen,
+              ),
+            );
+          }
+        },
         builder: (context, state) {
           if (state is TrackerLoading) {
             return const Center(child: CircularProgressIndicator());
@@ -71,102 +81,110 @@ class _TrackerScreenState extends State<TrackerScreen> {
             );
           }
 
-          if (state is TrackerLoaded) {
-            return SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 16),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'Upcoming',
-                      style: Theme.of(context).textTheme.headlineLarge,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (state.upcomingActivities.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Center(
-                        child: Column(
-                          children: [
-                            Icon(Icons.event_busy,
-                                size: 64, color: AppTheme.mediumGray),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No upcoming activities',
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: state.upcomingActivities.length,
-                      itemBuilder: (context, index) {
-                        final activity = state.upcomingActivities[index];
-                        return ActivityCard(
-                          activity: activity,
-                          onTap: () {
-                            _showActivityDetails(context, activity);
-                          },
-                        );
-                      },
-                    ),
-                  const SizedBox(height: 32),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      'Past',
-                      style: Theme.of(context).textTheme.headlineLarge,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (state.pastActivities.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(32),
-                      child: Center(
-                        child: Column(
-                          children: [
-                            Icon(Icons.history,
-                                size: 64, color: AppTheme.mediumGray),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No past activities',
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: state.pastActivities.length,
-                      itemBuilder: (context, index) {
-                        final activity = state.pastActivities[index];
-                        return ActivityCard(
-                          activity: activity,
-                          onTap: () {
-                            _showActivityDetails(context, activity);
-                          },
-                        );
-                      },
-                    ),
-                  const SizedBox(height: 32),
-                ],
-              ),
-            );
-          }
+          final upcomingActivities = state is TrackerLoaded
+              ? state.upcomingActivities
+              : state is TrackerOperationSuccess
+                  ? state.upcomingActivities
+                  : [];
 
-          return const SizedBox();
+          final pastActivities = state is TrackerLoaded
+              ? state.pastActivities
+              : state is TrackerOperationSuccess
+                  ? state.pastActivities
+                  : [];
+
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'Upcoming',
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (upcomingActivities.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.event_busy,
+                              size: 64, color: AppTheme.mediumGray),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No upcoming activities',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: upcomingActivities.length,
+                    itemBuilder: (context, index) {
+                      final activity = upcomingActivities[index];
+                      return ActivityCard(
+                        activity: activity,
+                        onTap: () {
+                          _showActivityDetails(context, activity);
+                        },
+                      );
+                    },
+                  ),
+                const SizedBox(height: 32),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'Past',
+                    style: Theme.of(context).textTheme.headlineLarge,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                if (pastActivities.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.history,
+                              size: 64, color: AppTheme.mediumGray),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No past activities',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: pastActivities.length,
+                    itemBuilder: (context, index) {
+                      final activity = pastActivities[index];
+                      return ActivityCard(
+                        activity: activity,
+                        onTap: () {
+                          _showActivityDetails(context, activity);
+                        },
+                      );
+                    },
+                  ),
+                const SizedBox(height: 32),
+              ],
+            ),
+          );
         },
       ),
     );
@@ -243,12 +261,58 @@ class _TrackerScreenState extends State<TrackerScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 24),
+                    // Show cancel button only if status is applied or confirmed
+                    if (activity.status.toString() == 'ActivityStatus.applied' ||
+                        activity.status.toString() == 'ActivityStatus.confirmed')
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showCancelConfirmation(context, activity.id);
+                          },
+                          icon: const Icon(Icons.cancel_outlined),
+                          label: const Text('Cancel Application'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showCancelConfirmation(BuildContext context, String activityId) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel Application'),
+        content: const Text(
+          'Are you sure you want to cancel this application? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('No, Keep It'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.read<TrackerBloc>().add(CancelApplication(activityId));
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
       ),
     );
   }
@@ -261,6 +325,10 @@ class _TrackerScreenState extends State<TrackerScreen> {
         return AppTheme.primaryGreen;
       case 'ActivityStatus.completed':
         return Colors.blue;
+      case 'ActivityStatus.rejected':
+        return Colors.red;
+      case 'ActivityStatus.cancelled':
+        return Colors.grey;
       default:
         return AppTheme.mediumGray;
     }

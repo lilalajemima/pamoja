@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/opportunity.dart';
 
 // Events
@@ -85,10 +86,13 @@ class OpportunitiesError extends OpportunitiesState {
 
 // BLoC
 class OpportunitiesBloc extends Bloc<OpportunitiesEvent, OpportunitiesState> {
+  final FirebaseFirestore _firestore;
   List<Opportunity> _allOpportunities = [];
   Set<String> _savedIds = {};
 
-  OpportunitiesBloc() : super(OpportunitiesInitial()) {
+  OpportunitiesBloc({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance,
+        super(OpportunitiesInitial()) {
     on<LoadOpportunities>(_onLoadOpportunities);
     on<FilterOpportunities>(_onFilterOpportunities);
     on<SearchOpportunities>(_onSearchOpportunities);
@@ -96,37 +100,46 @@ class OpportunitiesBloc extends Bloc<OpportunitiesEvent, OpportunitiesState> {
   }
 
   Future<void> _onLoadOpportunities(
-      LoadOpportunities event,
-      Emitter<OpportunitiesState> emit,
-      ) async {
+    LoadOpportunities event,
+    Emitter<OpportunitiesState> emit,
+  ) async {
     emit(OpportunitiesLoading());
 
     try {
-      await Future.delayed(const Duration(seconds: 1));
+      // Load opportunities from Firestore
+      final querySnapshot = await _firestore
+          .collection('opportunities')
+          .orderBy('title')
+          .get();
 
-      _allOpportunities = _getMockOpportunities();
+      _allOpportunities = querySnapshot.docs
+          .map((doc) => Opportunity.fromJson({
+                ...doc.data(),
+                'id': doc.id,
+              }))
+          .toList();
 
       emit(OpportunitiesLoaded(
         opportunities: _allOpportunities,
         savedOpportunityIds: _savedIds,
       ));
     } catch (e) {
-      emit(OpportunitiesError('Failed to load opportunities'));
+      emit(OpportunitiesError('Failed to load opportunities: ${e.toString()}'));
     }
   }
 
   Future<void> _onFilterOpportunities(
-      FilterOpportunities event,
-      Emitter<OpportunitiesState> emit,
-      ) async {
+    FilterOpportunities event,
+    Emitter<OpportunitiesState> emit,
+  ) async {
     if (state is OpportunitiesLoaded) {
       final currentState = state as OpportunitiesLoaded;
 
       final filtered = event.category.isEmpty
           ? _allOpportunities
           : _allOpportunities
-          .where((o) => o.category.toLowerCase() == event.category.toLowerCase())
-          .toList();
+              .where((o) => o.category.toLowerCase() == event.category.toLowerCase())
+              .toList();
 
       emit(currentState.copyWith(
         opportunities: filtered,
@@ -136,28 +149,28 @@ class OpportunitiesBloc extends Bloc<OpportunitiesEvent, OpportunitiesState> {
   }
 
   Future<void> _onSearchOpportunities(
-      SearchOpportunities event,
-      Emitter<OpportunitiesState> emit,
-      ) async {
+    SearchOpportunities event,
+    Emitter<OpportunitiesState> emit,
+  ) async {
     if (state is OpportunitiesLoaded) {
       final currentState = state as OpportunitiesLoaded;
 
       final filtered = event.query.isEmpty
           ? _allOpportunities
           : _allOpportunities
-          .where((o) =>
-      o.title.toLowerCase().contains(event.query.toLowerCase()) ||
-          o.description.toLowerCase().contains(event.query.toLowerCase()))
-          .toList();
+              .where((o) =>
+                  o.title.toLowerCase().contains(event.query.toLowerCase()) ||
+                  o.description.toLowerCase().contains(event.query.toLowerCase()))
+              .toList();
 
       emit(currentState.copyWith(opportunities: filtered));
     }
   }
 
   Future<void> _onToggleSaveOpportunity(
-      ToggleSaveOpportunity event,
-      Emitter<OpportunitiesState> emit,
-      ) async {
+    ToggleSaveOpportunity event,
+    Emitter<OpportunitiesState> emit,
+  ) async {
     if (state is OpportunitiesLoaded) {
       final currentState = state as OpportunitiesLoaded;
 
@@ -169,60 +182,5 @@ class OpportunitiesBloc extends Bloc<OpportunitiesEvent, OpportunitiesState> {
 
       emit(currentState.copyWith(savedOpportunityIds: Set.from(_savedIds)));
     }
-  }
-
-  List<Opportunity> _getMockOpportunities() {
-    return [
-      Opportunity(
-        id: '1',
-        title: 'Community Garden Assistant',
-        description: 'Help plant trees in the local park. Saturday, 9AM-12PM',
-        category: 'Environment',
-        location: 'Central Park Community Garden',
-        timeCommitment: '2 hours/week',
-        requirements: 'Age 16+ Enthusiasm',
-        imageUrl: 'https://images.unsplash.com/photo-1591189863430-ab87e120f312',
-      ),
-      Opportunity(
-        id: '2',
-        title: 'After-School Tutoring',
-        description: 'Assist students with homework. Tuesdays & Thursdays, 4 PM-6 PM',
-        category: 'Education',
-        location: 'Local Community Center',
-        timeCommitment: '4 hours/week',
-        requirements: 'Teaching experience preferred',
-        imageUrl: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b',
-      ),
-      Opportunity(
-        id: '3',
-        title: 'Blood Drive Volunteer',
-        description: 'Support a local blood drive. Next Sunday, 10AM-3PM',
-        category: 'Health',
-        location: 'City Hospital',
-        timeCommitment: '5 hours',
-        requirements: 'Age 18+',
-        imageUrl: 'https://images.unsplash.com/photo-1615461066159-fea0960485d5',
-      ),
-      Opportunity(
-        id: '4',
-        title: 'Animal Shelter Helper',
-        description: 'Care for animals and help with daily tasks',
-        category: 'Animals',
-        location: 'Local Animal Shelter',
-        timeCommitment: '3 hours/week',
-        requirements: 'Love for animals',
-        imageUrl: 'https://images.unsplash.com/photo-1450778869180-41d0601e046e',
-      ),
-      Opportunity(
-        id: '5',
-        title: 'Arts Festival Assistant',
-        description: 'Help organize and run community arts festival',
-        category: 'Arts & Culture',
-        location: 'Downtown Arts Center',
-        timeCommitment: '6 hours',
-        requirements: 'Creative mindset',
-        imageUrl: 'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b',
-      ),
-    ];
   }
 }

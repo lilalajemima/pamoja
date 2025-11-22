@@ -15,16 +15,18 @@ class LoadActivities extends TrackerEvent {}
 class ApplyToOpportunity extends TrackerEvent {
   final String opportunityId;
   final String opportunityTitle;
+  final String description;
   final String imageUrl;
 
   ApplyToOpportunity({
     required this.opportunityId,
     required this.opportunityTitle,
+    required this.description,
     required this.imageUrl,
   });
 
   @override
-  List<Object?> get props => [opportunityId, opportunityTitle, imageUrl];
+  List<Object?> get props => [opportunityId, opportunityTitle, description, imageUrl];
 }
 
 class UpdateActivityStatus extends TrackerEvent {
@@ -35,6 +37,15 @@ class UpdateActivityStatus extends TrackerEvent {
 
   @override
   List<Object?> get props => [activityId, newStatus];
+}
+
+class CancelApplication extends TrackerEvent {
+  final String activityId;
+
+  CancelApplication(this.activityId);
+
+  @override
+  List<Object?> get props => [activityId];
 }
 
 // States
@@ -98,6 +109,7 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
     on<LoadActivities>(_onLoadActivities);
     on<ApplyToOpportunity>(_onApplyToOpportunity);
     on<UpdateActivityStatus>(_onUpdateActivityStatus);
+    on<CancelApplication>(_onCancelApplication);
   }
 
   Future<void> _onLoadActivities(
@@ -205,13 +217,20 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         return;
       }
 
+      // Get user info
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final userData = userDoc.data() ?? {};
+
       // Create application in Firebase
       await _firestore.collection('applications').add({
         'userId': user.uid,
+        'userName': userData['name'] ?? 'User',
+        'userEmail': userData['email'] ?? user.email,
+        'userAvatar': userData['avatarUrl'] ?? 'https://i.pravatar.cc/150?u=${user.uid}',
         'opportunityId': event.opportunityId,
         'opportunityTitle': event.opportunityTitle,
         'imageUrl': event.imageUrl,
-        'description': 'Applied to volunteer opportunity',
+        'description': event.description,
         'status': 'applied',
         'appliedAt': FieldValue.serverTimestamp(),
         'progress': 0.0,
@@ -255,6 +274,48 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
       await _loadAndEmitActivities(emit, 'Status updated successfully!');
     } catch (e) {
       emit(TrackerError('Failed to update status: ${e.toString()}'));
+    }
+  }
+
+  Future<void> _onCancelApplication(
+    CancelApplication event,
+    Emitter<TrackerState> emit,
+  ) async {
+    try {
+      final user = _auth.currentUser;
+
+      if (user == null) {
+        emit(TrackerError('No user logged in'));
+        return;
+      }
+
+      // Get application to check status
+      final appDoc = await _firestore.collection('applications').doc(event.activityId).get();
+      
+      if (!appDoc.exists) {
+        emit(TrackerError('Application not found'));
+        return;
+      }
+
+      final appData = appDoc.data()!;
+      final status = appData['status'];
+
+      // Don't allow cancellation if already rejected
+      if (status == 'rejected') {
+        emit(TrackerError('Cannot cancel a rejected application'));
+        return;
+      }
+
+      // Update status to cancelled
+      await _firestore.collection('applications').doc(event.activityId).update({
+        'status': 'cancelled',
+        'cancelledAt': FieldValue.serverTimestamp(),
+      });
+
+      // Reload activities
+      await _loadAndEmitActivities(emit, 'Application cancelled successfully!');
+    } catch (e) {
+      emit(TrackerError('Failed to cancel application: ${e.toString()}'));
     }
   }
 

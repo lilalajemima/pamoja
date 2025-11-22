@@ -125,7 +125,9 @@ class ActivityCard extends StatelessWidget {
       case ActivityStatus.completed:
         return Colors.blue;
       case ActivityStatus.cancelled:
-        return Colors.red;
+        return Colors.grey;
+      default:
+        return Colors.red; // For rejected or any other status
     }
   }
 }

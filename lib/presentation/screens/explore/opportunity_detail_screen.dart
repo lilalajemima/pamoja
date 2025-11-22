@@ -179,6 +179,7 @@ class OpportunityDetailScreen extends StatelessWidget {
                               ApplyToOpportunity(
                                 opportunityId: opportunityId,
                                 opportunityTitle: opportunity.title,
+                                description: opportunity.description,
                                 imageUrl: opportunity.imageUrl,
                               ),
                             );
