@@ -12,7 +12,20 @@
           "package_name": "com.example.pamoja"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "286402908642-thsa6if3hfk2n55qoivsm9u20dsqns2u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.pamoja",
+            "certificate_hash": "63fd073b4f65c5abc3049f2e0bd2db650fdcb5ab"
+          }
+        },
+        {
+          "client_id": "286402908642-f64qremqp6ebnvtqfj1s02ou6l21da9j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAJO9pr_CB--L14hrMQXR8a40v7xKaG-YM"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "286402908642-f64qremqp6ebnvtqfj1s02ou6l21da9j.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
