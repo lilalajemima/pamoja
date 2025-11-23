@@ -126,7 +126,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         return;
       }
 
-      // Get all activities for this user
       final querySnapshot = await _firestore
           .collection('applications')
           .where('userId', isEqualTo: user.uid)
@@ -136,7 +135,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
       final allActivities = querySnapshot.docs.map((doc) {
         final data = doc.data();
 
-        // Handle Firestore Timestamp
         DateTime? date;
         if (data['appliedAt'] is Timestamp) {
           date = (data['appliedAt'] as Timestamp).toDate();
@@ -144,7 +142,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
           date = DateTime.parse(data['appliedAt']);
         }
 
-        // Parse status
         ActivityStatus status = ActivityStatus.applied;
         if (data['status'] != null) {
           try {
@@ -168,7 +165,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         );
       }).toList();
 
-      // Split into upcoming and past
       final now = DateTime.now();
       final upcoming = allActivities
           .where((a) =>
@@ -205,7 +201,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         return;
       }
 
-      // Check if user already applied
       final existingApplication = await _firestore
           .collection('applications')
           .where('userId', isEqualTo: user.uid)
@@ -217,11 +212,9 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         return;
       }
 
-      // Get user info
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       final userData = userDoc.data() ?? {};
 
-      // Create application in Firebase
       await _firestore.collection('applications').add({
         'userId': user.uid,
         'userName': userData['name'] ?? 'User',
@@ -236,7 +229,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         'progress': 0.0,
       });
 
-      // Reload activities
       await _loadAndEmitActivities(emit, 'Application submitted successfully!');
     } catch (e) {
       emit(TrackerError('Failed to apply: ${e.toString()}'));
@@ -255,22 +247,19 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         return;
       }
 
-      // Update status in Firebase
       await _firestore.collection('applications').doc(event.activityId).update({
         'status': event.newStatus.toString().split('.').last,
         'progress': event.newStatus == ActivityStatus.completed ? 1.0 : 0.5,
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      // If completed, update user's completed activities count
       if (event.newStatus == ActivityStatus.completed) {
         await _firestore.collection('users').doc(user.uid).update({
           'completedActivities': FieldValue.increment(1),
-          'totalHours': FieldValue.increment(3), // Assume 3 hours per activity
+          'totalHours': FieldValue.increment(3),
         });
       }
 
-      // Reload activities
       await _loadAndEmitActivities(emit, 'Status updated successfully!');
     } catch (e) {
       emit(TrackerError('Failed to update status: ${e.toString()}'));
@@ -281,6 +270,9 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
     CancelApplication event,
     Emitter<TrackerState> emit,
   ) async {
+    // Show loading first
+    emit(TrackerLoading());
+    
     try {
       final user = _auth.currentUser;
 
@@ -289,32 +281,24 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         return;
       }
 
-      // Get application to check status
-      final appDoc = await _firestore.collection('applications').doc(event.activityId).get();
-      
-      if (!appDoc.exists) {
-        emit(TrackerError('Application not found'));
-        return;
-      }
+      // Get the current state to preserve data
+      final currentUpcoming = state is TrackerLoaded 
+          ? (state as TrackerLoaded).upcomingActivities 
+          : <VolunteerActivity>[];
+      final currentPast = state is TrackerLoaded 
+          ? (state as TrackerLoaded).pastActivities 
+          : <VolunteerActivity>[];
 
-      final appData = appDoc.data()!;
-      final status = appData['status'];
-
-      // Don't allow cancellation if already rejected
-      if (status == 'rejected') {
-        emit(TrackerError('Cannot cancel a rejected application'));
-        return;
-      }
-
-      // Update status to cancelled
+      // Update in Firestore
       await _firestore.collection('applications').doc(event.activityId).update({
         'status': 'cancelled',
         'cancelledAt': FieldValue.serverTimestamp(),
       });
 
-      // Reload activities
-      await _loadAndEmitActivities(emit, 'Application cancelled successfully!');
+      // Reload activities from Firestore
+      await _loadAndEmitActivities(emit, 'Application cancelled successfully');
     } catch (e) {
+      print('Cancel error: $e');
       emit(TrackerError('Failed to cancel application: ${e.toString()}'));
     }
   }
@@ -387,6 +371,7 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         pastActivities: past,
       ));
     } catch (e) {
+      print('Load error: $e');
       emit(TrackerError('Failed to reload activities: ${e.toString()}'));
     }
   }

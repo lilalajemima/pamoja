@@ -337,125 +337,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           ),
                           const SizedBox(height: 24),
                         ],
-                        
-                        // Interests
-                        if (userData['interests'] != null && (userData['interests'] as List).isNotEmpty) ...[
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Interests',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: (userData['interests'] as List).map((interest) {
-                              return Chip(
-                                label: Text(interest.toString()),
-                                backgroundColor: AppTheme.lightGreen,
-                              );
-                            }).toList(),
-                          ),
-                          const SizedBox(height: 24),
-                        ],
-                        
-                        // Volunteer History
-                        if (userData['volunteerHistory'] != null && (userData['volunteerHistory'] as List).isNotEmpty) ...[
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Volunteering History',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ...(userData['volunteerHistory'] as List).map((history) {
-                            final historyMap = history as Map<String, dynamic>;
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).cardColor,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Theme.of(context).dividerColor,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.lightGreen,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        historyMap['icon'] ?? '🌟',
-                                        style: const TextStyle(fontSize: 24),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          historyMap['title'] ?? '',
-                                          style: Theme.of(context).textTheme.titleMedium,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          historyMap['subtitle'] ?? '',
-                                          style: Theme.of(context).textTheme.bodyMedium,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          const SizedBox(height: 24),
-                        ],
-                        
-                        // Certificates
-                        if (userData['certificates'] != null && (userData['certificates'] as List).isNotEmpty) ...[
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Certificates',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 200,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: (userData['certificates'] as List).length,
-                              itemBuilder: (context, index) {
-                                return Container(
-                                  width: 280,
-                                  margin: const EdgeInsets.only(right: 12),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    image: DecorationImage(
-                                      image: NetworkImage(
-                                        userData['certificates'][index].toString(),
-                                      ),
-                                      fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                   ),
@@ -475,6 +356,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 
   void _showCommentsSheet(BuildContext context, String postId) {
+    final commentController = TextEditingController();
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -566,7 +449,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 ),
               ),
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 16,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+                ),
                 decoration: BoxDecoration(
                   color: Theme.of(context).cardColor,
                   boxShadow: [
@@ -581,6 +469,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   children: [
                     Expanded(
                       child: TextField(
+                        controller: commentController,
                         decoration: InputDecoration(
                           hintText: 'Write a comment...',
                           border: OutlineInputBorder(
@@ -591,20 +480,18 @@ class _CommunityScreenState extends State<CommunityScreen> {
                             vertical: 8,
                           ),
                         ),
-                        onSubmitted: (value) {
-                          if (value.isNotEmpty) {
-                            context.read<CommunityBloc>().add(
-                                  CommentOnPost(postId, value),
-                                );
-                          }
-                        },
                       ),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.send, color: AppTheme.primaryGreen),
                       onPressed: () {
-                        // Handle send
+                        if (commentController.text.isNotEmpty) {
+                          context.read<CommunityBloc>().add(
+                                CommentOnPost(postId, commentController.text),
+                              );
+                          commentController.clear();
+                        }
                       },
                     ),
                   ],
@@ -815,7 +702,7 @@ class _CommentItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'User',
+                  comment['userName'] ?? 'User',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 4),

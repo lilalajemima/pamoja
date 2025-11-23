@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../blocs/opportunities/opportunities_bloc.dart';
 import '../../widgets/opportunity_card.dart';
@@ -29,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); // Rebuild when tab changes
+    });
     context.read<OpportunitiesBloc>().add(LoadOpportunities());
   }
 
@@ -131,7 +135,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 }
 
                 if (state is OpportunitiesLoaded) {
-                  if (state.opportunities.isEmpty) {
+                  // Filter based on tab selection
+                  List<dynamic> displayOpportunities = [];
+                  
+                  if (_tabController.index == 0) {
+                    // Recommended - show all filtered opportunities
+                    displayOpportunities = state.opportunities;
+                  } else if (_tabController.index == 2) {
+                    // Saved - only show saved opportunities
+                    displayOpportunities = state.opportunities
+                        .where((opp) => state.savedOpportunityIds.contains(opp.id))
+                        .toList();
+                  } else {
+                    // Upcoming - show all for now
+                    displayOpportunities = state.opportunities;
+                  }
+
+                  if (displayOpportunities.isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -140,35 +160,66 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               size: 64, color: AppTheme.mediumGray),
                           const SizedBox(height: 16),
                           Text(
-                            'No opportunities found',
+                            _tabController.index == 2 
+                                ? 'No saved opportunities'
+                                : 'No opportunities found',
                             style: Theme.of(context).textTheme.bodyLarge,
                           ),
+                          if (_tabController.index == 2)
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                'Tap the bookmark icon on opportunities to save them',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
                         ],
                       ),
                     );
                   }
 
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: state.opportunities.length,
-                    itemBuilder: (context, index) {
-                      final opportunity = state.opportunities[index];
-                      final isSaved = state.savedOpportunityIds
-                          .contains(opportunity.id);
-
-                      return OpportunityCard(
-                        opportunity: opportunity,
-                        isSaved: isSaved,
-                        onTap: () {
-                          // Navigate to detail screen
-                        },
-                        onSaveToggle: () {
-                          context.read<OpportunitiesBloc>().add(
-                            ToggleSaveOpportunity(opportunity.id),
-                          );
-                        },
-                      );
+                  return RefreshIndicator(
+                    onRefresh: () async {
+                      context.read<OpportunitiesBloc>().add(LoadOpportunities());
                     },
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: displayOpportunities.length,
+                      itemBuilder: (context, index) {
+                        final opportunity = displayOpportunities[index];
+                        final isSaved = state.savedOpportunityIds
+                            .contains(opportunity.id);
+
+                        return OpportunityCard(
+                          opportunity: opportunity,
+                          isSaved: isSaved,
+                          onTap: () {
+                            // Navigate to detail screen
+                            context.push('/opportunity/${opportunity.id}');
+                          },
+                          onSaveToggle: () {
+                            // Toggle save state
+                            context.read<OpportunitiesBloc>().add(
+                              ToggleSaveOpportunity(opportunity.id),
+                            );
+                            
+                            // Show feedback
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  isSaved 
+                                      ? 'Removed from saved' 
+                                      : 'Saved successfully',
+                                ),
+                                duration: const Duration(seconds: 1),
+                                backgroundColor: AppTheme.primaryGreen,
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
                   );
                 }
 
