@@ -39,8 +39,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Pamoja'),
+        centerTitle: true,
+        backgroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
@@ -55,32 +59,94 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // "Your Feed" heading
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
             child: Text(
               'Your Feed',
-              style: Theme.of(context).textTheme.headlineLarge,
+              style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 28,
+                  ),
             ),
           ),
-          TabBar(
-            controller: _tabController,
-            labelColor: AppTheme.primaryGreen,
-            unselectedLabelColor: AppTheme.mediumGray,
-            indicatorColor: AppTheme.primaryGreen,
-            tabs: const [
-              Tab(text: 'Recommended'),
-              Tab(text: 'Upcoming'),
-              Tab(text: 'Saved'),
-            ],
+          
+          // Tabs
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: Colors.white,
+              unselectedLabelColor: AppTheme.darkText,
+              indicatorSize: TabBarIndicatorSize.label,
+              indicator: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                color: AppTheme.primaryGreen,
+              ),
+              labelStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+              dividerColor: Colors.transparent,
+              tabs: [
+                Tab(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: _tabController.index == 0
+                          ? AppTheme.primaryGreen
+                          : AppTheme.lightGreen.withOpacity(0.3),
+                    ),
+                    child: const Text('Recommended'),
+                  ),
+                ),
+                Tab(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: _tabController.index == 1
+                          ? AppTheme.primaryGreen
+                          : AppTheme.lightGreen.withOpacity(0.3),
+                    ),
+                    child: const Text('Upcoming'),
+                  ),
+                ),
+                Tab(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: _tabController.index == 2
+                          ? AppTheme.primaryGreen
+                          : AppTheme.lightGreen.withOpacity(0.3),
+                    ),
+                    child: const Text('Saved'),
+                  ),
+                ),
+              ],
+            ),
           ),
+          
+          const SizedBox(height: 20),
+          
+          // Categories Section
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Categories',
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -93,11 +159,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       onTap: () {
                         setState(() {
                           _selectedCategory =
-                          _selectedCategory == category ? '' : category;
+                              _selectedCategory == category ? '' : category;
                         });
                         context.read<OpportunitiesBloc>().add(
-                          FilterOpportunities(_selectedCategory),
-                        );
+                              FilterOpportunities(_selectedCategory),
+                            );
                       },
                     );
                   }).toList(),
@@ -105,14 +171,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ],
             ),
           ),
+          
+          const SizedBox(height: 20),
+          
+          // "Opportunities Near You" heading
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Text(
               'Opportunities Near You',
-              style: Theme.of(context).textTheme.headlineMedium,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
             ),
           ),
+          
           const SizedBox(height: 12),
+          
+          // Opportunities List
           Expanded(
             child: BlocBuilder<OpportunitiesBloc, OpportunitiesState>(
               builder: (context, state) {
@@ -137,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 if (state is OpportunitiesLoaded) {
                   // Filter based on tab selection
                   List<dynamic> displayOpportunities = [];
-                  
+
                   if (_tabController.index == 0) {
                     // Recommended - show all filtered opportunities
                     displayOpportunities = state.opportunities;
@@ -160,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               size: 64, color: AppTheme.mediumGray),
                           const SizedBox(height: 16),
                           Text(
-                            _tabController.index == 2 
+                            _tabController.index == 2
                                 ? 'No saved opportunities'
                                 : 'No opportunities found',
                             style: Theme.of(context).textTheme.bodyLarge,
@@ -184,39 +260,39 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       context.read<OpportunitiesBloc>().add(LoadOpportunities());
                     },
                     child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
                       itemCount: displayOpportunities.length,
                       itemBuilder: (context, index) {
                         final opportunity = displayOpportunities[index];
                         final isSaved = state.savedOpportunityIds
                             .contains(opportunity.id);
 
-                        return OpportunityCard(
-                          opportunity: opportunity,
-                          isSaved: isSaved,
-                          onTap: () {
-                            // Navigate to detail screen
-                            context.push('/opportunity/${opportunity.id}');
-                          },
-                          onSaveToggle: () {
-                            // Toggle save state
-                            context.read<OpportunitiesBloc>().add(
-                              ToggleSaveOpportunity(opportunity.id),
-                            );
-                            
-                            // Show feedback
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  isSaved 
-                                      ? 'Removed from saved' 
-                                      : 'Saved successfully',
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: _OpportunityCompactCard(
+                            opportunity: opportunity,
+                            isSaved: isSaved,
+                            onTap: () {
+                              context.push('/opportunity/${opportunity.id}');
+                            },
+                            onSaveToggle: () {
+                              context.read<OpportunitiesBloc>().add(
+                                    ToggleSaveOpportunity(opportunity.id),
+                                  );
+
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    isSaved
+                                        ? 'Removed from saved'
+                                        : 'Saved successfully',
+                                  ),
+                                  duration: const Duration(seconds: 1),
+                                  backgroundColor: AppTheme.primaryGreen,
                                 ),
-                                duration: const Duration(seconds: 1),
-                                backgroundColor: AppTheme.primaryGreen,
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         );
                       },
                     ),
@@ -236,5 +312,172 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+}
+
+// Compact card matching Figma design
+class _OpportunityCompactCard extends StatelessWidget {
+  final dynamic opportunity;
+  final bool isSaved;
+  final VoidCallback onTap;
+  final VoidCallback onSaveToggle;
+
+  const _OpportunityCompactCard({
+    required this.opportunity,
+    required this.isSaved,
+    required this.onTap,
+    required this.onSaveToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppTheme.lightGray, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Category badge and bookmark
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightGreen,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      opportunity.category,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppTheme.primaryGreen,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: onSaveToggle,
+                    child: Icon(
+                      isSaved ? Icons.bookmark : Icons.bookmark_border,
+                      color: isSaved ? AppTheme.primaryGreen : AppTheme.mediumGray,
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Image placeholder
+            Container(
+              height: 120,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppTheme.lightGray,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(12),
+                ),
+              ),
+              child: opportunity.imageUrl.isNotEmpty
+                  ? ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(12),
+                      ),
+                      child: Image.network(
+                        opportunity.imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Icon(Icons.image_not_supported,
+                                color: AppTheme.mediumGray),
+                          );
+                        },
+                      ),
+                    )
+                  : const Center(
+                      child: Icon(Icons.image_not_supported,
+                          color: AppTheme.mediumGray),
+                    ),
+            ),
+            
+            // Title and details
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    opportunity.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    opportunity.description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppTheme.mediumGray,
+                          fontSize: 13,
+                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
+                        color: AppTheme.mediumGray,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          opportunity.location,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.mediumGray,
+                                fontSize: 12,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time,
+                        size: 14,
+                        color: AppTheme.mediumGray,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        opportunity.timeCommitment,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.mediumGray,
+                              fontSize: 12,
+                            ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

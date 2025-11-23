@@ -132,15 +132,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         return;
       }
 
-      // Check if email is verified (only for email/password accounts)
-      if (!user.emailVerified) {
-        emit(EmailVerificationPending(
-          email: user.email!,
-          userId: user.uid,
-        ));
-        return;
-      }
-
+      // For login, we DON'T check email verification
+      // Only check if user profile exists
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
 
       if (!userDoc.exists) {
@@ -228,7 +221,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         'emailVerified': false,
       });
 
-      // Emit verification pending state
+      // Emit verification pending state ONLY for signup
       emit(EmailVerificationPending(
         email: user.email!,
         userId: user.uid,
@@ -267,7 +260,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final user = _firebaseAuth.currentUser;
       if (user != null && !user.emailVerified) {
         await user.sendEmailVerification();
-        emit(AuthError('Verification email sent! Please check your inbox.'));
+        // Don't emit error state here, just a success message
+        // The UI will handle showing the snackbar
       }
     } catch (e) {
       emit(AuthError('Failed to send verification email: ${e.toString()}'));
@@ -364,18 +358,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         return;
       }
 
-      // Reload user to get updated email verification status
-      await user.reload();
-      final currentUser = _firebaseAuth.currentUser;
-
-      if (currentUser != null && !currentUser.emailVerified) {
-        emit(EmailVerificationPending(
-          email: currentUser.email!,
-          userId: currentUser.uid,
-        ));
-        return;
-      }
-
+      // For CheckAuthStatus, we DON'T check email verification
+      // This allows users who verified their email to stay logged in
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
 
       if (userDoc.exists) {

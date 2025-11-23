@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../presentation/screens/onboarding/onboarding_screen.dart';
 import '../../../presentation/screens/auth/login_screen.dart';
 import '../../../presentation/screens/auth/signup_screen.dart';
+import '../../../presentation/screens/auth/email_verification_screen.dart';
 import '../../../presentation/screens/main/main_navigation_screen.dart';
 import '../../../presentation/screens/home/home_screen.dart';
 import '../../../presentation/screens/explore/explore_screen.dart';
@@ -15,11 +17,14 @@ import '../../../presentation/screens/admin/admin_login_screen.dart';
 import '../../../presentation/screens/admin/admin_dashboard_screen.dart';
 import '../../../presentation/screens/admin/opportunity_form_screen.dart';
 import '../../../domain/models/opportunity.dart';
+import '../../../presentation/blocs/auth/auth_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AppRouter {
   static const String onboarding = '/';
   static const String login = '/login';
   static const String signup = '/signup';
+  static const String verifyEmail = '/verify-email';
   static const String home = '/main/home';
   static const String explore = '/main/explore';
   static const String tracker = '/main/tracker';
@@ -37,6 +42,34 @@ class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: onboarding,
     debugLogDiagnostics: true,
+    redirect: (context, state) async {
+      final authState = context.read<AuthBloc>().state;
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
+      
+      final isOnboarding = state.matchedLocation == '/';
+      final isAuthPage = state.matchedLocation == '/login' || 
+                        state.matchedLocation == '/signup' ||
+                        state.matchedLocation == '/verify-email';
+      final isAdminPage = state.matchedLocation.startsWith('/admin');
+      
+      // If authenticated and trying to access auth pages, redirect to home
+      if (authState is Authenticated && (isAuthPage || isOnboarding)) {
+        return home;
+      }
+      
+      // If not authenticated and trying to access protected pages
+      if (authState is Unauthenticated && !isAuthPage && !isOnboarding && !isAdminPage) {
+        return hasSeenOnboarding ? login : onboarding;
+      }
+      
+      // If on onboarding and has seen it before, go to login
+      if (isOnboarding && hasSeenOnboarding && authState is! Authenticated) {
+        return login;
+      }
+      
+      return null; // No redirect needed
+    },
     errorBuilder: (context, state) => Scaffold(
       body: Center(
         child: Text('Error: ${state.error}'),
@@ -55,6 +88,15 @@ class AppRouter {
       GoRoute(
         path: '/signup',
         builder: (context, state) => const SignupScreen(),
+      ),
+      
+      // Email Verification
+      GoRoute(
+        path: '/verify-email',
+        builder: (context, state) {
+          final email = state.uri.queryParameters['email'] ?? '';
+          return EmailVerificationScreen(email: email);
+        },
       ),
       
       // Admin Routes

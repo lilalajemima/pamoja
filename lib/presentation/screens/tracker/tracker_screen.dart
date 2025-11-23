@@ -22,151 +22,198 @@ class _TrackerScreenState extends State<TrackerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.lightGray,
-      appBar: AppBar(
-        title: const Text('Tracker'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            decoration: BoxDecoration(
-              color: AppTheme.lightGreen,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              icon: const Icon(
-                Icons.notifications_outlined,
-                color: AppTheme.primaryGreen,
-              ),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Notifications coming soon!')),
-                );
-              },
-            ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: _buildAppBar(context),
+      body: _buildBody(context),
+    );
+  }
+
+  // ==================== APP BAR ====================
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppBar(
+      title: const Text('Tracker'),
+      backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+      elevation: 0,
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 16),
+          decoration: BoxDecoration(
+            color: AppTheme.lightGreen,
+            shape: BoxShape.circle,
           ),
-        ],
-      ),
-      body: BlocConsumer<TrackerBloc, TrackerState>(
-        listener: (context, state) {
-          if (state is TrackerOperationSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppTheme.primaryGreen,
-              ),
-            );
-          }
-        },
-        builder: (context, state) {
-          if (state is TrackerLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+          child: IconButton(
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: AppTheme.primaryGreen,
+            ),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Notifications coming soon!')),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
 
-          if (state is TrackerError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline,
-                      size: 64, color: AppTheme.mediumGray),
-                  const SizedBox(height: 16),
-                  Text(state.message),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      context.read<TrackerBloc>().add(LoadActivities());
-                    },
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            );
-          }
+  // ==================== BODY ====================
+  Widget _buildBody(BuildContext context) {
+    return BlocConsumer<TrackerBloc, TrackerState>(
+      listener: _handleStateChanges,
+      builder: (context, state) {
+        if (state is TrackerLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          final upcomingActivities = state is TrackerLoaded
-              ? state.upcomingActivities
-              : state is TrackerOperationSuccess
-                  ? state.upcomingActivities
-                  : [];
+        if (state is TrackerError) {
+          return _buildErrorState(context, state.message);
+        }
 
-          final pastActivities = state is TrackerLoaded
-              ? state.pastActivities
-              : state is TrackerOperationSuccess
-                  ? state.pastActivities
-                  : [];
+        return _buildActivitiesList(context, state);
+      },
+    );
+  }
 
-          return RefreshIndicator(
-            onRefresh: () async {
+  // ==================== STATE HANDLERS ====================
+  void _handleStateChanges(BuildContext context, TrackerState state) {
+    if (state is TrackerOperationSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.message),
+          backgroundColor: AppTheme.primaryGreen,
+        ),
+      );
+    }
+  }
+
+  Widget _buildErrorState(BuildContext context, String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: AppTheme.mediumGray),
+          const SizedBox(height: 16),
+          Text(message),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: () {
               context.read<TrackerBloc>().add(LoadActivities());
             },
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Upcoming Section
-                    Text(
-                      'Upcoming',
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (upcomingActivities.isEmpty)
-                      _buildEmptyState(
-                        icon: Icons.event_busy,
-                        message: 'No upcoming activities',
-                      )
-                    else
-                      ...upcomingActivities.map((activity) {
-                        return _ActivityCard(
-                          activity: activity,
-                          onTap: () => _showActivityDetails(context, activity),
-                        );
-                      }).toList(),
-                    const SizedBox(height: 32),
-                    
-                    // Past Section
-                    Text(
-                      'Past',
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (pastActivities.isEmpty)
-                      _buildEmptyState(
-                        icon: Icons.history,
-                        message: 'No past activities',
-                      )
-                    else
-                      ...pastActivities.map((activity) {
-                        return _ActivityCard(
-                          activity: activity,
-                          onTap: () => _showActivityDetails(context, activity),
-                        );
-                      }).toList(),
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+            child: const Text('Retry'),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildEmptyState({required IconData icon, required String message}) {
+  // ==================== ACTIVITIES LIST ====================
+  Widget _buildActivitiesList(BuildContext context, TrackerState state) {
+    final upcomingActivities = _getUpcomingActivities(state);
+    final pastActivities = _getPastActivities(state);
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        context.read<TrackerBloc>().add(LoadActivities());
+      },
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Upcoming Section
+              _buildSectionHeader(context, 'Upcoming'),
+              const SizedBox(height: 16),
+              _buildActivitiesSection(
+                context,
+                upcomingActivities,
+                Icons.event_busy,
+                'No upcoming activities',
+              ),
+              const SizedBox(height: 32),
+
+              // Past Section
+              _buildSectionHeader(context, 'Past'),
+              const SizedBox(height: 16),
+              _buildActivitiesSection(
+                context,
+                pastActivities,
+                Icons.history,
+                'No past activities',
+              ),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<VolunteerActivity> _getUpcomingActivities(TrackerState state) {
+    if (state is TrackerLoaded) {
+      return state.upcomingActivities;
+    } else if (state is TrackerOperationSuccess) {
+      return state.upcomingActivities;
+    }
+    return [];
+  }
+
+  List<VolunteerActivity> _getPastActivities(TrackerState state) {
+    if (state is TrackerLoaded) {
+      return state.pastActivities;
+    } else if (state is TrackerOperationSuccess) {
+      return state.pastActivities;
+    }
+    return [];
+  }
+
+  // ==================== SECTION BUILDERS ====================
+  Widget _buildSectionHeader(BuildContext context, String title) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+    );
+  }
+
+  Widget _buildActivitiesSection(
+    BuildContext context,
+    List<VolunteerActivity> activities,
+    IconData emptyIcon,
+    String emptyMessage,
+  ) {
+    if (activities.isEmpty) {
+      return _buildEmptyState(
+        context: context,
+        icon: emptyIcon,
+        message: emptyMessage,
+      );
+    }
+
+    return Column(
+      children: activities.map((activity) {
+        return _ActivityCard(
+          activity: activity,
+          onTap: () => _showActivityDetails(context, activity),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildEmptyState({
+    required BuildContext context,
+    required IconData icon,
+    required String message,
+  }) {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Center(
         child: Column(
@@ -185,6 +232,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
     );
   }
 
+  // ==================== ACTIVITY DETAILS MODAL ====================
   void _showActivityDetails(BuildContext context, VolunteerActivity activity) {
     showModalBottomSheet(
       context: context,
@@ -195,6 +243,7 @@ class _TrackerScreenState extends State<TrackerScreen> {
   }
 }
 
+// ==================== ACTIVITY CARD WIDGET ====================
 class _ActivityCard extends StatelessWidget {
   final VolunteerActivity activity;
   final VoidCallback onTap;
@@ -212,8 +261,9 @@ class _ActivityCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Theme.of(context).dividerColor),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -224,108 +274,127 @@ class _ActivityCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Row(
-              children: [
-                // Activity Image
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: CachedNetworkImage(
-                    imageUrl: activity.imageUrl,
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      width: 60,
-                      height: 60,
-                      color: AppTheme.lightGray,
-                      child: const Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      width: 60,
-                      height: 60,
-                      color: AppTheme.lightGray,
-                      child: const Icon(Icons.image_not_supported),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                
-                // Activity Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        activity.title,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        activity.description,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppTheme.mediumGray,
-                            ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Arrow Icon
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: AppTheme.primaryGreen,
-                ),
-              ],
-            ),
+            _buildCardHeader(context),
             const SizedBox(height: 16),
-            
-            // Progress Bar and Status
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: activity.progressValue,
-                      backgroundColor: AppTheme.lightGray,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppTheme.primaryGreen,
-                      ),
-                      minHeight: 8,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(activity.status).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    activity.statusLabel,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: _getStatusColor(activity.status),
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                ),
-              ],
-            ),
+            _buildProgressBar(context),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCardHeader(BuildContext context) {
+    return Row(
+      children: [
+        _buildActivityImage(),
+        const SizedBox(width: 16),
+        _buildActivityInfo(context),
+        _buildArrowIcon(),
+      ],
+    );
+  }
+
+  Widget _buildActivityImage() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: CachedNetworkImage(
+        imageUrl: activity.imageUrl,
+        width: 60,
+        height: 60,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(
+          width: 60,
+          height: 60,
+          color: AppTheme.lightGray,
+          child: const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        errorWidget: (context, url, error) => Container(
+          width: 60,
+          height: 60,
+          color: AppTheme.lightGray,
+          child: const Icon(Icons.image_not_supported),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityInfo(BuildContext context) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            activity.title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            activity.description,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.mediumGray,
+                ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildArrowIcon() {
+    return const Icon(
+      Icons.arrow_forward_ios,
+      size: 16,
+      color: AppTheme.primaryGreen,
+    );
+  }
+
+  Widget _buildProgressBar(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: activity.progressValue,
+              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? AppTheme.darkCard
+                  : AppTheme.lightGray,
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                AppTheme.primaryGreen,
+              ),
+              minHeight: 8,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        _buildStatusBadge(context),
+      ],
+    );
+  }
+
+  Widget _buildStatusBadge(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: _getStatusColor(activity.status).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        activity.statusLabel,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: _getStatusColor(activity.status),
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }
@@ -344,6 +413,7 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
+// ==================== ACTIVITY DETAILS SHEET ====================
 class _ActivityDetailsSheet extends StatelessWidget {
   final VolunteerActivity activity;
 
@@ -353,95 +423,28 @@ class _ActivityDetailsSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.7,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppTheme.lightGray,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
+          _buildHandle(context),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Activity Image
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: CachedNetworkImage(
-                      imageUrl: activity.imageUrl,
-                      width: double.infinity,
-                      height: 200,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                  _buildActivityImage(context),
                   const SizedBox(height: 24),
-                  
-                  // Title
-                  Text(
-                    activity.title,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
+                  _buildTitle(context),
                   const SizedBox(height: 12),
-                  
-                  // Description
-                  Text(
-                    activity.description,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppTheme.mediumGray,
-                        ),
-                  ),
+                  _buildDescription(context),
                   const SizedBox(height: 24),
-                  
-                  // Progress Steps
-                  _buildProgressSteps(context, activity),
+                  _buildProgressSteps(context),
                   const SizedBox(height: 24),
-                  
-                  // Status Container
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.lightGray,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Status',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(activity.status),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            activity.statusLabel,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildStatusContainer(context),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -452,7 +455,53 @@ class _ActivityDetailsSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildProgressSteps(BuildContext context, VolunteerActivity activity) {
+  Widget _buildHandle(BuildContext context) {
+    return Column(
+      children: [
+        const SizedBox(height: 12),
+        Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: Theme.of(context).dividerColor,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActivityImage(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: CachedNetworkImage(
+        imageUrl: activity.imageUrl,
+        width: double.infinity,
+        height: 200,
+        fit: BoxFit.cover,
+      ),
+    );
+  }
+
+  Widget _buildTitle(BuildContext context) {
+    return Text(
+      activity.title,
+      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+    );
+  }
+
+  Widget _buildDescription(BuildContext context) {
+    return Text(
+      activity.description,
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: AppTheme.mediumGray,
+          ),
+    );
+  }
+
+  Widget _buildProgressSteps(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -472,7 +521,10 @@ class _ActivityDetailsSheet extends StatelessWidget {
               isActive: activity.currentStep >= 1,
               isCompleted: activity.currentStep > 1,
             ),
-            _buildConnector(isActive: activity.currentStep >= 2),
+            _buildConnector(
+              context,
+              isActive: activity.currentStep >= 2,
+            ),
             _buildStep(
               context,
               number: 2,
@@ -480,7 +532,10 @@ class _ActivityDetailsSheet extends StatelessWidget {
               isActive: activity.currentStep >= 2,
               isCompleted: activity.currentStep > 2,
             ),
-            _buildConnector(isActive: activity.currentStep >= 3),
+            _buildConnector(
+              context,
+              isActive: activity.currentStep >= 3,
+            ),
             _buildStep(
               context,
               number: 3,
@@ -534,12 +589,49 @@ class _ActivityDetailsSheet extends StatelessWidget {
     );
   }
 
-  Widget _buildConnector({required bool isActive}) {
+  Widget _buildConnector(BuildContext context, {required bool isActive}) {
     return Expanded(
       child: Container(
         height: 2,
         margin: const EdgeInsets.only(bottom: 28),
         color: isActive ? AppTheme.primaryGreen : AppTheme.lightGray,
+      ),
+    );
+  }
+
+  Widget _buildStatusContainer(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Theme.of(context).dividerColor),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Status',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 6,
+            ),
+            decoration: BoxDecoration(
+              color: _getStatusColor(activity.status),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              activity.statusLabel,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

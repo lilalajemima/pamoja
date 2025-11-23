@@ -26,6 +26,8 @@ class _SignupScreenState extends State<SignupScreen> {
         listener: (context, state) {
           if (state is Authenticated) {
             context.go(AppRouter.home);
+          } else if (state is EmailVerificationPending) {
+            context.go('/verify-email?email=${Uri.encodeComponent(state.email)}');
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(

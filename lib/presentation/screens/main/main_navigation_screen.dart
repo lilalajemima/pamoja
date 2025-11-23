@@ -80,13 +80,16 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       // Ignore routing errors
     }
 
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
+          color: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
+              color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.08),
               blurRadius: 8,
               offset: const Offset(0, -2),
             ),
@@ -96,9 +99,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
+          backgroundColor: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
           selectedItemColor: AppTheme.primaryGreen,
-          unselectedItemColor: AppTheme.mediumGray,
+          unselectedItemColor: isDarkMode 
+              ? const Color(0xFF757575) 
+              : AppTheme.mediumGray,
           selectedFontSize: 12,
           unselectedFontSize: 12,
           elevation: 0,
