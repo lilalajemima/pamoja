@@ -48,11 +48,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return;
       }
 
-      // Convert image to base64
       final bytes = await image.readAsBytes();
       final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
 
-      // Update profile with new avatar URL (base64 string)
       context.read<ProfileBloc>().add(
             UpdateProfile(
               profileState.profile.copyWith(avatarUrl: base64Image),
@@ -84,7 +82,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _uploadCertificate() async {
     try {
-      // Show dialog to choose between image and PDF
       final choice = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
@@ -122,11 +119,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         if (image == null) return;
 
-        // Convert image to base64
         final bytes = await image.readAsBytes();
         final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
 
-        // Add certificate
         final updatedCertificates = List<String>.from(profileState.profile.certificates);
         updatedCertificates.add(base64Image);
         
@@ -143,7 +138,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           );
         }
       } else if (choice == 'pdf') {
-        // For PDF, we'll store metadata only since displaying PDFs is complex
         final TextEditingController pdfNameController = TextEditingController();
         
         final confirmed = await showDialog<bool>(
@@ -177,7 +171,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
 
         if (confirmed == true && pdfNameController.text.isNotEmpty) {
-          // Store PDF as text indicator (since we can't store actual PDFs in Firestore easily)
           final pdfIndicator = 'data:text/pdf;name,${pdfNameController.text}';
           
           final updatedCertificates = List<String>.from(profileState.profile.certificates);
@@ -212,8 +205,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppTheme.lightGray,
       appBar: AppBar(
         title: const Text('Profile'),
+        backgroundColor: Colors.white,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -256,234 +252,164 @@ class _ProfileScreenState extends State<ProfileScreen> {
             return SingleChildScrollView(
               child: Column(
                 children: [
-                  const SizedBox(height: 24),
-                  Stack(
-                    children: [
-                      _isUploadingImage
-                          ? Container(
-                              width: 120,
-                              height: 120,
-                              decoration: BoxDecoration(
-                                color: AppTheme.lightGreen,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            )
-                          : CircleAvatar(
-                              radius: 60,
-                              backgroundColor: AppTheme.lightGreen,
-                              backgroundImage: profile.avatarUrl.startsWith('data:image')
-                                  ? MemoryImage(
-                                      base64Decode(profile.avatarUrl.split(',')[1]),
-                                    )
-                                  : CachedNetworkImageProvider(profile.avatarUrl) as ImageProvider,
-                            ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: GestureDetector(
-                          onTap: _isUploadingImage ? null : _uploadProfileImage,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
-                              color: AppTheme.primaryGreen,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    profile.name,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    profile.role,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppTheme.primaryGreen,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  // Profile Header Section
+                  Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        Stack(
                           children: [
-                            Text(
-                              'Skills',
-                              style: Theme.of(context).textTheme.headlineMedium,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add, color: AppTheme.primaryGreen),
-                              onPressed: () => _showAddSkillDialog(context),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: profile.skills.map((skill) {
-                            return SkillChip(
-                              label: skill,
-                              onDelete: () {
-                                context.read<ProfileBloc>().add(RemoveSkill(skill));
-                              },
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 32),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Interests',
-                              style: Theme.of(context).textTheme.headlineMedium,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add, color: AppTheme.primaryGreen),
-                              onPressed: () => _showAddInterestDialog(context),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: profile.interests.map((interest) {
-                            return SkillChip(
-                              label: interest,
-                              onDelete: () {
-                                context.read<ProfileBloc>().add(RemoveInterest(interest));
-                              },
-                            );
-                          }).toList(),
-                        ),
-                        const SizedBox(height: 32),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Volunteering History',
-                              style: Theme.of(context).textTheme.headlineMedium,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add, color: AppTheme.primaryGreen),
-                              onPressed: () => _showAddHistoryDialog(context, profile),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        if (profile.volunteerHistory.isEmpty)
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                'No volunteer history yet',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ),
-                          )
-                        else
-                          ...profile.volunteerHistory.map((history) {
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppTheme.lightGray),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 48,
-                                    height: 48,
+                            _isUploadingImage
+                                ? Container(
+                                    width: 120,
+                                    height: 120,
                                     decoration: BoxDecoration(
                                       color: AppTheme.lightGreen,
-                                      borderRadius: BorderRadius.circular(12),
+                                      shape: BoxShape.circle,
                                     ),
-                                    child: Center(
-                                      child: Text(
-                                        history['icon'] ?? '🌟',
-                                        style: const TextStyle(fontSize: 24),
-                                      ),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(),
                                     ),
+                                  )
+                                : CircleAvatar(
+                                    radius: 60,
+                                    backgroundColor: AppTheme.lightGreen,
+                                    backgroundImage: profile.avatarUrl.startsWith('data:image')
+                                        ? MemoryImage(
+                                            base64Decode(profile.avatarUrl.split(',')[1]),
+                                          )
+                                        : CachedNetworkImageProvider(profile.avatarUrl) as ImageProvider,
                                   ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          history['title'] ?? '',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleMedium,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          history['subtitle'] ?? '',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .bodyMedium,
-                                        ),
-                                      ],
-                                    ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                onTap: _isUploadingImage ? null : _uploadProfileImage,
+                                child: Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: const BoxDecoration(
+                                    color: AppTheme.primaryGreen,
+                                    shape: BoxShape.circle,
                                   ),
-                                ],
+                                  child: const Icon(
+                                    Icons.edit,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                ),
                               ),
-                            );
-                          }).toList(),
-                        const SizedBox(height: 32),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Certificates',
-                              style: Theme.of(context).textTheme.headlineMedium,
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.add, color: AppTheme.primaryGreen),
-                              onPressed: _uploadCertificate,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        if (profile.certificates.isEmpty)
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
-                                'No certificates yet',
-                                style: Theme.of(context).textTheme.bodyMedium,
+                        const SizedBox(height: 16),
+                        Text(
+                          profile.name,
+                          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
                               ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          profile.role,
+                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                color: AppTheme.primaryGreen,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Skills Section
+                  _buildSection(
+                    context: context,
+                    title: 'Skills',
+                    onAdd: () => _showAddSkillDialog(context),
+                    child: profile.skills.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              'No skills added yet',
+                              style: TextStyle(color: AppTheme.mediumGray),
                             ),
                           )
-                        else
-                          SizedBox(
+                        : Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: profile.skills.map((skill) {
+                                return SkillChip(
+                                  label: skill,
+                                  onDelete: () {
+                                    context.read<ProfileBloc>().add(RemoveSkill(skill));
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Interests Section
+                  _buildSection(
+                    context: context,
+                    title: 'Interests',
+                    onAdd: () => _showAddInterestDialog(context),
+                    child: profile.interests.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              'No interests added yet',
+                              style: TextStyle(color: AppTheme.mediumGray),
+                            ),
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: profile.interests.map((interest) {
+                                return SkillChip(
+                                  label: interest,
+                                  onDelete: () {
+                                    context.read<ProfileBloc>().add(RemoveInterest(interest));
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Volunteering History Section (Auto + Manual)
+                  _buildVolunteeringHistorySection(context, profile),
+                  const SizedBox(height: 16),
+                  
+                  // Certificates Section
+                  _buildSection(
+                    context: context,
+                    title: 'Certificates',
+                    onAdd: _uploadCertificate,
+                    child: profile.certificates.isEmpty
+                        ? const Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Text(
+                              'No certificates yet',
+                              style: TextStyle(color: AppTheme.mediumGray),
+                            ),
+                          )
+                        : SizedBox(
                             height: 200,
                             child: ListView.builder(
                               scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.all(16),
                               itemCount: profile.certificates.length,
                               itemBuilder: (context, index) {
                                 final cert = profile.certificates[index];
                                 
-                                // Check if it's a PDF
                                 if (cert.startsWith('data:text/pdf')) {
                                   final name = cert.split(',')[1];
                                   return Container(
@@ -516,7 +442,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   );
                                 }
                                 
-                                // It's an image (base64 or URL)
                                 return Container(
                                   width: 280,
                                   margin: const EdgeInsets.only(right: 12),
@@ -539,10 +464,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               },
                             ),
                           ),
-                        const SizedBox(height: 48),
-                      ],
-                    ),
                   ),
+                  const SizedBox(height: 32),
                 ],
               ),
             );
@@ -552,6 +475,184 @@ class _ProfileScreenState extends State<ProfileScreen> {
         },
       ),
     );
+  }
+
+  Widget _buildSection({
+    required BuildContext context,
+    required String title,
+    required VoidCallback onAdd,
+    required Widget child,
+  }) {
+    return Container(
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.add, color: AppTheme.primaryGreen),
+                  onPressed: onAdd,
+                ),
+              ],
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVolunteeringHistorySection(BuildContext context, profile) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _getVolunteeringHistory(),
+      builder: (context, snapshot) {
+        final autoHistory = snapshot.data ?? [];
+        final manualHistory = profile.volunteerHistory;
+        final allHistory = [...autoHistory, ...manualHistory];
+
+        return _buildSection(
+          context: context,
+          title: 'Volunteering History',
+          onAdd: () => _showAddHistoryDialog(context, profile),
+          child: allHistory.isEmpty
+              ? const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text(
+                    'No volunteer history yet',
+                    style: TextStyle(color: AppTheme.mediumGray),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  itemCount: allHistory.length,
+                  itemBuilder: (context, index) {
+                    final history = allHistory[index];
+                    final bool hasImage = history['imageUrl'] != null && history['imageUrl'].toString().isNotEmpty;
+                    
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.lightGray,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          hasImage
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: CachedNetworkImage(
+                                    imageUrl: history['imageUrl'],
+                                    width: 48,
+                                    height: 48,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (context, url, error) => Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.lightGreen,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Center(
+                                        child: history['icon'] != null
+                                            ? Text(
+                                                history['icon'],
+                                                style: const TextStyle(fontSize: 24),
+                                              )
+                                            : const Icon(
+                                                Icons.volunteer_activism,
+                                                color: AppTheme.primaryGreen,
+                                              ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.lightGreen,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Center(
+                                    child: history['icon'] != null
+                                        ? Text(
+                                            history['icon'],
+                                            style: const TextStyle(fontSize: 24),
+                                          )
+                                        : const Icon(
+                                            Icons.volunteer_activism,
+                                            color: AppTheme.primaryGreen,
+                                          ),
+                                  ),
+                                ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  history['title'] ?? '',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  history['subtitle'] ?? '',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(color: AppTheme.mediumGray),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+        );
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> _getVolunteeringHistory() async {
+    try {
+      final user = context.read<AuthBloc>().state;
+      if (user is! Authenticated) return [];
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('applications')
+          .where('userId', isEqualTo: user.userId)
+          .where('status', isEqualTo: 'completed')
+          .get();
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'imageUrl': data['imageUrl'] ?? '',
+          'title': data['opportunityTitle'] ?? 'Volunteer Activity',
+          'subtitle': 'Completed',
+        };
+      }).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   void _showAddSkillDialog(BuildContext context) {
@@ -564,7 +665,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           controller: controller,
           decoration: const InputDecoration(
             labelText: 'Skill',
-            hintText: 'e.g., Leadership, Communication',
+            hintText: 'e.g., Event Planning',
           ),
         ),
         actions: [
@@ -596,7 +697,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           controller: controller,
           decoration: const InputDecoration(
             labelText: 'Interest',
-            hintText: 'e.g., Environment, Education',
+            hintText: 'e.g., Environment',
           ),
         ),
         actions: [

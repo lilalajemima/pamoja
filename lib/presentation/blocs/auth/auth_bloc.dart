@@ -41,6 +41,8 @@ class LogoutRequested extends AuthEvent {}
 
 class CheckAuthStatus extends AuthEvent {}
 
+class ResendVerificationEmail extends AuthEvent {}
+
 // States
 abstract class AuthState extends Equatable {
   @override
@@ -67,6 +69,19 @@ class Authenticated extends AuthState {
 }
 
 class Unauthenticated extends AuthState {}
+
+class EmailVerificationPending extends AuthState {
+  final String email;
+  final String userId;
+
+  EmailVerificationPending({
+    required this.email,
+    required this.userId,
+  });
+
+  @override
+  List<Object?> get props => [email, userId];
+}
 
 class AuthError extends AuthState {
   final String message;
@@ -96,6 +111,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<GoogleSignInRequested>(_onGoogleSignInRequested);
     on<LogoutRequested>(_onLogoutRequested);
     on<CheckAuthStatus>(_onCheckAuthStatus);
+    on<ResendVerificationEmail>(_onResendVerificationEmail);
   }
 
   Future<void> _onLoginRequested(
@@ -105,7 +121,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
 
     try {
-      // Sign in with Firebase Auth
       final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
         email: event.email.trim(),
         password: event.password,
@@ -117,11 +132,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         return;
       }
 
-      // Get user data from Firestore
+      // Check if email is verified (only for email/password accounts)
+      if (!user.emailVerified) {
+        emit(EmailVerificationPending(
+          email: user.email!,
+          userId: user.uid,
+        ));
+        return;
+      }
+
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
 
       if (!userDoc.exists) {
-        // User document doesn't exist (shouldn't happen, but handle it)
         emit(AuthError('User profile not found. Please sign up.'));
         await _firebaseAuth.signOut();
         return;
@@ -173,7 +195,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
 
     try {
-      // Create user with Firebase Auth
       final userCredential = await _firebaseAuth.createUserWithEmailAndPassword(
         email: event.email.trim(),
         password: event.password,
@@ -188,6 +209,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       // Update display name
       await user.updateDisplayName(event.name);
 
+      // Send email verification
+      await user.sendEmailVerification();
+
       // Create user document in Firestore
       await _firestore.collection('users').doc(user.uid).set({
         'name': event.name.trim(),
@@ -201,12 +225,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         'totalHours': 0,
         'completedActivities': 0,
         'createdAt': FieldValue.serverTimestamp(),
+        'emailVerified': false,
       });
 
-      emit(Authenticated(
-        userId: user.uid,
+      // Emit verification pending state
+      emit(EmailVerificationPending(
         email: user.email!,
-        name: event.name,
+        userId: user.uid,
       ));
     } on FirebaseAuthException catch (e) {
       String errorMessage = 'Signup failed';
@@ -234,6 +259,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
+  Future<void> _onResendVerificationEmail(
+    ResendVerificationEmail event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+        emit(AuthError('Verification email sent! Please check your inbox.'));
+      }
+    } catch (e) {
+      emit(AuthError('Failed to send verification email: ${e.toString()}'));
+    }
+  }
+
   Future<void> _onGoogleSignInRequested(
     GoogleSignInRequested event,
     Emitter<AuthState> emit,
@@ -241,26 +281,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(AuthLoading());
 
     try {
-      // Trigger Google Sign In
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
-        // User canceled the sign-in
         emit(Unauthenticated());
         return;
       }
 
-      // Obtain auth details
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
 
-      // Create credential
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // Sign in to Firebase
       final userCredential =
           await _firebaseAuth.signInWithCredential(credential);
 
@@ -274,7 +309,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
 
       if (!userDoc.exists) {
-        // Create new user document for Google sign-in
         await _firestore.collection('users').doc(user.uid).set({
           'name': user.displayName ?? 'User',
           'email': user.email!,
@@ -287,6 +321,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           'totalHours': 0,
           'completedActivities': 0,
           'createdAt': FieldValue.serverTimestamp(),
+          'emailVerified': true, // Google accounts are pre-verified
         });
       }
 
@@ -329,7 +364,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         return;
       }
 
-      // Get user data from Firestore
+      // Reload user to get updated email verification status
+      await user.reload();
+      final currentUser = _firebaseAuth.currentUser;
+
+      if (currentUser != null && !currentUser.emailVerified) {
+        emit(EmailVerificationPending(
+          email: currentUser.email!,
+          userId: currentUser.uid,
+        ));
+        return;
+      }
+
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
 
       if (userDoc.exists) {
@@ -340,7 +386,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           name: userData['name'] ?? 'User',
         ));
       } else {
-        // User in Auth but no Firestore doc
         await _firebaseAuth.signOut();
         emit(Unauthenticated());
       }

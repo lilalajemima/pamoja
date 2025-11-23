@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../domain/models/opportunity.dart';
 import '../../blocs/admin_opportunities/admin_opportunities_bloc.dart';
@@ -16,14 +18,18 @@ class OpportunityFormScreen extends StatefulWidget {
 
 class _OpportunityFormScreenState extends State<OpportunityFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final ImagePicker _picker = ImagePicker();
+  
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
   late TextEditingController _locationController;
   late TextEditingController _timeCommitmentController;
   late TextEditingController _requirementsController;
-  late TextEditingController _imageUrlController;
 
   String _selectedCategory = 'Environment';
+  String? _imageBase64;
+  bool _isUploadingImage = false;
+
   final List<String> _categories = [
     'Environment',
     'Education',
@@ -43,10 +49,51 @@ class _OpportunityFormScreenState extends State<OpportunityFormScreen> {
     _locationController = TextEditingController(text: widget.opportunity?.location ?? '');
     _timeCommitmentController = TextEditingController(text: widget.opportunity?.timeCommitment ?? '');
     _requirementsController = TextEditingController(text: widget.opportunity?.requirements ?? '');
-    _imageUrlController = TextEditingController(text: widget.opportunity?.imageUrl ?? '');
     
     if (widget.opportunity != null) {
       _selectedCategory = widget.opportunity!.category;
+      _imageBase64 = widget.opportunity!.imageUrl;
+    }
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      setState(() => _isUploadingImage = true);
+      
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+
+      if (image == null) {
+        setState(() => _isUploadingImage = false);
+        return;
+      }
+
+      final bytes = await image.readAsBytes();
+      final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+      
+      setState(() {
+        _imageBase64 = base64Image;
+        _isUploadingImage = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Image uploaded successfully!'),
+          backgroundColor: AppTheme.primaryGreen,
+        ),
+      );
+    } catch (e) {
+      setState(() => _isUploadingImage = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to upload image: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -79,6 +126,55 @@ class _OpportunityFormScreenState extends State<OpportunityFormScreen> {
                 Text(
                   isEditMode ? 'Update opportunity details' : 'Enter opportunity details',
                   style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 24),
+                
+                // Image Upload Section
+                GestureDetector(
+                  onTap: _pickImage,
+                  child: Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: AppTheme.lightGray,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppTheme.lightGreen, width: 2),
+                    ),
+                    child: _isUploadingImage
+                        ? const Center(child: CircularProgressIndicator())
+                        : _imageBase64 != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: _imageBase64!.startsWith('data:image')
+                                    ? Image.memory(
+                                        base64Decode(_imageBase64!.split(',')[1]),
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                      )
+                                    : Image.network(
+                                        _imageBase64!,
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                      ),
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.add_photo_alternate,
+                                    size: 64,
+                                    color: AppTheme.primaryGreen,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'Tap to upload image',
+                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                          color: AppTheme.primaryGreen,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                  ),
                 ),
                 const SizedBox(height: 24),
                 
@@ -184,32 +280,6 @@ class _OpportunityFormScreenState extends State<OpportunityFormScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 16),
-
-                // Image URL
-                TextFormField(
-                  controller: _imageUrlController,
-                  decoration: const InputDecoration(
-                    labelText: 'Image URL *',
-                    hintText: 'https://images.unsplash.com/...',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter an image URL';
-                    }
-                    if (!value.startsWith('http')) {
-                      return 'Please enter a valid URL';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Use Unsplash or similar free image services',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.mediumGray,
-                      ),
-                ),
                 const SizedBox(height: 32),
 
                 // Submit Button
@@ -252,6 +322,16 @@ class _OpportunityFormScreenState extends State<OpportunityFormScreen> {
 
   void _submitForm() {
     if (_formKey.currentState!.validate()) {
+      if (_imageBase64 == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please upload an image'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       final opportunity = Opportunity(
         id: widget.opportunity?.id ?? '',
         title: _titleController.text.trim(),
@@ -260,7 +340,7 @@ class _OpportunityFormScreenState extends State<OpportunityFormScreen> {
         location: _locationController.text.trim(),
         timeCommitment: _timeCommitmentController.text.trim(),
         requirements: _requirementsController.text.trim(),
-        imageUrl: _imageUrlController.text.trim(),
+        imageUrl: _imageBase64!,
       );
 
       if (isEditMode) {
@@ -278,7 +358,6 @@ class _OpportunityFormScreenState extends State<OpportunityFormScreen> {
     _locationController.dispose();
     _timeCommitmentController.dispose();
     _requirementsController.dispose();
-    _imageUrlController.dispose();
     super.dispose();
   }
 }

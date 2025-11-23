@@ -39,15 +39,6 @@ class UpdateActivityStatus extends TrackerEvent {
   List<Object?> get props => [activityId, newStatus];
 }
 
-class CancelApplication extends TrackerEvent {
-  final String activityId;
-
-  CancelApplication(this.activityId);
-
-  @override
-  List<Object?> get props => [activityId];
-}
-
 // States
 abstract class TrackerState extends Equatable {
   @override
@@ -109,7 +100,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
     on<LoadActivities>(_onLoadActivities);
     on<ApplyToOpportunity>(_onApplyToOpportunity);
     on<UpdateActivityStatus>(_onUpdateActivityStatus);
-    on<CancelApplication>(_onCancelApplication);
   }
 
   Future<void> _onLoadActivities(
@@ -135,11 +125,25 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
       final allActivities = querySnapshot.docs.map((doc) {
         final data = doc.data();
 
-        DateTime? date;
+        DateTime? appliedDate;
         if (data['appliedAt'] is Timestamp) {
-          date = (data['appliedAt'] as Timestamp).toDate();
+          appliedDate = (data['appliedAt'] as Timestamp).toDate();
         } else if (data['appliedAt'] is String) {
-          date = DateTime.parse(data['appliedAt']);
+          appliedDate = DateTime.parse(data['appliedAt']);
+        }
+
+        DateTime? confirmedDate;
+        if (data['confirmedAt'] is Timestamp) {
+          confirmedDate = (data['confirmedAt'] as Timestamp).toDate();
+        } else if (data['confirmedAt'] is String) {
+          confirmedDate = DateTime.parse(data['confirmedAt']);
+        }
+
+        DateTime? completedDate;
+        if (data['completedAt'] is Timestamp) {
+          completedDate = (data['completedAt'] as Timestamp).toDate();
+        } else if (data['completedAt'] is String) {
+          completedDate = DateTime.parse(data['completedAt']);
         }
 
         ActivityStatus status = ActivityStatus.applied;
@@ -160,8 +164,10 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
           description: data['description'] ?? 'Volunteer activity',
           imageUrl: data['imageUrl'] ?? 'https://images.unsplash.com/photo-1559027615-cd4628902d4a',
           status: status,
-          date: date,
-          progress: (data['progress'] as num?)?.toDouble() ?? 0.0,
+          appliedDate: appliedDate,
+          confirmedDate: confirmedDate,
+          completedDate: completedDate,
+          rejectionReason: data['rejectionReason'] as String?,
         );
       }).toList();
 
@@ -169,15 +175,13 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
       final upcoming = allActivities
           .where((a) =>
               a.status != ActivityStatus.completed &&
-              a.status != ActivityStatus.cancelled &&
-              (a.date == null || a.date!.isAfter(now)))
+              a.status != ActivityStatus.rejected)
           .toList();
 
       final past = allActivities
           .where((a) =>
               a.status == ActivityStatus.completed ||
-              a.status == ActivityStatus.cancelled ||
-              (a.date != null && a.date!.isBefore(now)))
+              a.status == ActivityStatus.rejected)
           .toList();
 
       emit(TrackerLoaded(
@@ -226,7 +230,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         'description': event.description,
         'status': 'applied',
         'appliedAt': FieldValue.serverTimestamp(),
-        'progress': 0.0,
       });
 
       await _loadAndEmitActivities(emit, 'Application submitted successfully!');
@@ -247,11 +250,18 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         return;
       }
 
-      await _firestore.collection('applications').doc(event.activityId).update({
+      final updateData = <String, dynamic>{
         'status': event.newStatus.toString().split('.').last,
-        'progress': event.newStatus == ActivityStatus.completed ? 1.0 : 0.5,
         'updatedAt': FieldValue.serverTimestamp(),
-      });
+      };
+
+      if (event.newStatus == ActivityStatus.confirmed) {
+        updateData['confirmedAt'] = FieldValue.serverTimestamp();
+      } else if (event.newStatus == ActivityStatus.completed) {
+        updateData['completedAt'] = FieldValue.serverTimestamp();
+      }
+
+      await _firestore.collection('applications').doc(event.activityId).update(updateData);
 
       if (event.newStatus == ActivityStatus.completed) {
         await _firestore.collection('users').doc(user.uid).update({
@@ -263,43 +273,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
       await _loadAndEmitActivities(emit, 'Status updated successfully!');
     } catch (e) {
       emit(TrackerError('Failed to update status: ${e.toString()}'));
-    }
-  }
-
-  Future<void> _onCancelApplication(
-    CancelApplication event,
-    Emitter<TrackerState> emit,
-  ) async {
-    // Show loading first
-    emit(TrackerLoading());
-    
-    try {
-      final user = _auth.currentUser;
-
-      if (user == null) {
-        emit(TrackerError('No user logged in'));
-        return;
-      }
-
-      // Get the current state to preserve data
-      final currentUpcoming = state is TrackerLoaded 
-          ? (state as TrackerLoaded).upcomingActivities 
-          : <VolunteerActivity>[];
-      final currentPast = state is TrackerLoaded 
-          ? (state as TrackerLoaded).pastActivities 
-          : <VolunteerActivity>[];
-
-      // Update in Firestore
-      await _firestore.collection('applications').doc(event.activityId).update({
-        'status': 'cancelled',
-        'cancelledAt': FieldValue.serverTimestamp(),
-      });
-
-      // Reload activities from Firestore
-      await _loadAndEmitActivities(emit, 'Application cancelled successfully');
-    } catch (e) {
-      print('Cancel error: $e');
-      emit(TrackerError('Failed to cancel application: ${e.toString()}'));
     }
   }
 
@@ -320,11 +293,25 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
       final allActivities = querySnapshot.docs.map((doc) {
         final data = doc.data();
 
-        DateTime? date;
+        DateTime? appliedDate;
         if (data['appliedAt'] is Timestamp) {
-          date = (data['appliedAt'] as Timestamp).toDate();
+          appliedDate = (data['appliedAt'] as Timestamp).toDate();
         } else if (data['appliedAt'] is String) {
-          date = DateTime.parse(data['appliedAt']);
+          appliedDate = DateTime.parse(data['appliedAt']);
+        }
+
+        DateTime? confirmedDate;
+        if (data['confirmedAt'] is Timestamp) {
+          confirmedDate = (data['confirmedAt'] as Timestamp).toDate();
+        } else if (data['confirmedAt'] is String) {
+          confirmedDate = DateTime.parse(data['confirmedAt']);
+        }
+
+        DateTime? completedDate;
+        if (data['completedAt'] is Timestamp) {
+          completedDate = (data['completedAt'] as Timestamp).toDate();
+        } else if (data['completedAt'] is String) {
+          completedDate = DateTime.parse(data['completedAt']);
         }
 
         ActivityStatus status = ActivityStatus.applied;
@@ -345,24 +332,23 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
           description: data['description'] ?? 'Volunteer activity',
           imageUrl: data['imageUrl'] ?? 'https://images.unsplash.com/photo-1559027615-cd4628902d4a',
           status: status,
-          date: date,
-          progress: (data['progress'] as num?)?.toDouble() ?? 0.0,
+          appliedDate: appliedDate,
+          confirmedDate: confirmedDate,
+          completedDate: completedDate,
+          rejectionReason: data['rejectionReason'] as String?,
         );
       }).toList();
 
-      final now = DateTime.now();
       final upcoming = allActivities
           .where((a) =>
               a.status != ActivityStatus.completed &&
-              a.status != ActivityStatus.cancelled &&
-              (a.date == null || a.date!.isAfter(now)))
+              a.status != ActivityStatus.rejected)
           .toList();
 
       final past = allActivities
           .where((a) =>
               a.status == ActivityStatus.completed ||
-              a.status == ActivityStatus.cancelled ||
-              (a.date != null && a.date!.isBefore(now)))
+              a.status == ActivityStatus.rejected)
           .toList();
 
       emit(TrackerOperationSuccess(

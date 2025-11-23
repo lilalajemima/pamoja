@@ -12,7 +12,7 @@ class AdminApplicationsScreen extends StatefulWidget {
 }
 
 class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
-  String _selectedFilter = 'all'; // all, applied, confirmed, rejected
+  String _selectedFilter = 'all'; // all, applied, confirmed, completed, rejected
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +30,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
               const PopupMenuItem(value: 'all', child: Text('All Applications')),
               const PopupMenuItem(value: 'applied', child: Text('Pending')),
               const PopupMenuItem(value: 'confirmed', child: Text('Confirmed')),
+              const PopupMenuItem(value: 'completed', child: Text('Completed')),
               const PopupMenuItem(value: 'rejected', child: Text('Rejected')),
             ],
           ),
@@ -84,8 +85,9 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
                 applicationId: app.id,
                 data: data,
                 onViewProfile: () => _showUserProfile(context, data['userId']),
-                onConfirm: () => _confirmApplication(app.id, data),
+                onConfirm: () => _confirmApplication(app.id),
                 onReject: () => _rejectApplication(app.id),
+                onComplete: () => _completeApplication(app.id),
               );
             },
           );
@@ -263,7 +265,7 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
     }
   }
 
-  Future<void> _confirmApplication(String applicationId, Map<String, dynamic> data) async {
+  Future<void> _confirmApplication(String applicationId) async {
     try {
       await FirebaseFirestore.instance
           .collection('applications')
@@ -343,6 +345,75 @@ class _AdminApplicationsScreenState extends State<AdminApplicationsScreen> {
       }
     }
   }
+
+  Future<void> _completeApplication(String applicationId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Mark as Complete'),
+        content: const Text('Are you sure you want to mark this activity as completed?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryGreen),
+            child: const Text('Complete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Get application data to update user stats
+        final appDoc = await FirebaseFirestore.instance
+            .collection('applications')
+            .doc(applicationId)
+            .get();
+            
+        final appData = appDoc.data()!;
+        
+        // Update application status
+        await FirebaseFirestore.instance
+            .collection('applications')
+            .doc(applicationId)
+            .update({
+          'status': 'completed',
+          'completedAt': FieldValue.serverTimestamp(),
+        });
+
+        // Update user stats
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(appData['userId'])
+            .update({
+          'completedActivities': FieldValue.increment(1),
+          'totalHours': FieldValue.increment(3), // Add 3 hours per activity
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Application marked as completed!'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
 }
 
 class _ApplicationCard extends StatelessWidget {
@@ -351,6 +422,7 @@ class _ApplicationCard extends StatelessWidget {
   final VoidCallback onViewProfile;
   final VoidCallback onConfirm;
   final VoidCallback onReject;
+  final VoidCallback onComplete;
 
   const _ApplicationCard({
     required this.applicationId,
@@ -358,6 +430,7 @@ class _ApplicationCard extends StatelessWidget {
     required this.onViewProfile,
     required this.onConfirm,
     required this.onReject,
+    required this.onComplete,
   });
 
   @override
@@ -483,6 +556,19 @@ class _ApplicationCard extends StatelessWidget {
                   ),
                 ],
               ),
+            ] else if (status == 'confirmed') ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: onComplete,
+                  icon: const Icon(Icons.check_circle, size: 18),
+                  label: const Text('Mark as Completed'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                  ),
+                ),
+              ),
             ],
           ],
         ),
@@ -509,6 +595,10 @@ class _StatusBadge extends StatelessWidget {
       case 'confirmed':
         color = AppTheme.primaryGreen;
         label = 'Confirmed';
+        break;
+      case 'completed':
+        color = Colors.blue;
+        label = 'Completed';
         break;
       case 'rejected':
         color = Colors.red;

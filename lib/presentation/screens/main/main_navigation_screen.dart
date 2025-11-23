@@ -26,8 +26,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     ),
     NavigationItem(
       label: 'Explore',
-      icon: Icons.explore_outlined,
-      activeIcon: Icons.explore,
+      icon: Icons.search,
+      activeIcon: Icons.search,
       route: '/main/explore',
     ),
     NavigationItem(
@@ -82,23 +82,46 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     return Scaffold(
       body: widget.child,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: AppTheme.primaryGreen,
-        unselectedItemColor: AppTheme.mediumGray,
-        selectedFontSize: 12,
-        unselectedFontSize: 12,
-        elevation: 8,
-        items: _navItems.map((item) {
-          return BottomNavigationBarItem(
-            icon: Icon(item.icon, size: 24),
-            activeIcon: Icon(item.activeIcon, size: 24),
-            label: item.label,
-          );
-        }).toList(),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: _onItemTapped,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          selectedItemColor: AppTheme.primaryGreen,
+          unselectedItemColor: AppTheme.mediumGray,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          elevation: 0,
+          selectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontWeight: FontWeight.normal,
+          ),
+          items: _navItems.map((item) {
+            final isSelected = _navItems.indexOf(item) == _selectedIndex;
+            return BottomNavigationBarItem(
+              icon: Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Icon(
+                  isSelected ? item.activeIcon : item.icon,
+                  size: 24,
+                ),
+              ),
+              label: item.label,
+            );
+          }).toList(),
+        ),
       ),
     );
   }
