@@ -48,7 +48,9 @@ class ActivityCard extends StatelessWidget {
                       children: [
                         Text(
                           activity.title,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -63,7 +65,7 @@ class ActivityCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Icon(
+                  const Icon(
                     Icons.chevron_right,
                     color: AppTheme.primaryGreen,
                   ),
@@ -78,7 +80,7 @@ class ActivityCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: LinearProgressIndicator(
-                          value: activity.progress,
+                          value: activity.progressValue, // FIXED: Changed from activity.progress
                           backgroundColor: AppTheme.lightGray,
                           valueColor: AlwaysStoppedAnimation<Color>(
                             _getStatusColor(activity.status),
@@ -94,15 +96,15 @@ class ActivityCard extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: _getStatusColor(activity.status).withOpacity(0.1),
+                          color: _getStatusColor(activity.status).withValues(alpha: 0.1), // FIXED: withValues instead of withOpacity
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           activity.statusLabel,
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: _getStatusColor(activity.status),
-                            fontWeight: FontWeight.w600,
-                          ),
+                                color: _getStatusColor(activity.status),
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                     ],
@@ -124,10 +126,10 @@ class ActivityCard extends StatelessWidget {
         return AppTheme.primaryGreen;
       case ActivityStatus.completed:
         return Colors.blue;
-      case ActivityStatus.cancelled:
-        return Colors.grey;
+      case ActivityStatus.rejected: // FIXED: Changed from ActivityStatus.cancelled
+        return Colors.red;
       default:
-        return Colors.red; // For rejected or any other status
+        return Colors.grey;
     }
   }
 }

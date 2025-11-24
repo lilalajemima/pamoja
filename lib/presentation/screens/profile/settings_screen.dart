@@ -18,8 +18,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
   bool _emailNotifications = true;
-  bool _pushNotifications = true;
-  String _selectedLanguage = 'English';
+  bool _inAppNotifications = true;
 
   @override
   void initState() {
@@ -32,8 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _notificationsEnabled = prefs.getBool('notifications') ?? true;
       _emailNotifications = prefs.getBool('emailNotifications') ?? true;
-      _pushNotifications = prefs.getBool('pushNotifications') ?? true;
-      _selectedLanguage = prefs.getString('language') ?? 'English';
+      _inAppNotifications = prefs.getBool('inAppNotifications') ?? true;
     });
   }
 
@@ -80,12 +78,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           if (_notificationsEnabled) ...[
             _buildSwitchTile(
-              title: 'Push Notifications',
-              subtitle: 'Receive push notifications on your device',
-              value: _pushNotifications,
+              title: 'In-App Notifications',
+              subtitle: 'Receive notifications within the app',
+              value: _inAppNotifications,
               onChanged: (value) {
-                setState(() => _pushNotifications = value);
-                _savePreference('pushNotifications', value);
+                setState(() => _inAppNotifications = value);
+                _savePreference('inAppNotifications', value);
               },
             ),
             _buildSwitchTile(
@@ -127,16 +125,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const Divider(),
           
-          // Language Section
-          _buildSectionHeader('Language'),
-          _buildListTile(
-            title: 'App Language',
-            subtitle: _selectedLanguage,
-            icon: Icons.language,
-            onTap: () => _showLanguageDialog(context),
-          ),
-          const Divider(),
-          
           // Account Section
           _buildSectionHeader('Account'),
           _buildListTile(
@@ -144,33 +132,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.lock_outline,
             onTap: () {
               _showChangePasswordDialog(context);
-            },
-          ),
-          _buildListTile(
-            title: 'Clear Cache',
-            icon: Icons.cleaning_services_outlined,
-            onTap: () async {
-              final prefs = await SharedPreferences.getInstance();
-              // Don't clear auth-related preferences
-              final darkMode = prefs.getBool('darkMode');
-              final hasSeenOnboarding = prefs.getBool('hasSeenOnboarding');
-              
-              await prefs.clear();
-              
-              // Restore important preferences
-              if (darkMode != null) await prefs.setBool('darkMode', darkMode);
-              if (hasSeenOnboarding != null) {
-                await prefs.setBool('hasSeenOnboarding', hasSeenOnboarding);
-              }
-              
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Cache cleared successfully'),
-                    backgroundColor: AppTheme.primaryGreen,
-                  ),
-                );
-              }
             },
           ),
           const Divider(),
@@ -266,77 +227,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showLanguageDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Select Language'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            RadioListTile<String>(
-              title: const Text('English'),
-              value: 'English',
-              groupValue: _selectedLanguage,
-              onChanged: (value) async {
-                setState(() => _selectedLanguage = value!);
-                await _savePreference('language', value);
-                Navigator.pop(context);
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Language changed to $value'),
-                    backgroundColor: AppTheme.primaryGreen,
-                  ),
-                );
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('French'),
-              value: 'French',
-              groupValue: _selectedLanguage,
-              onChanged: (value) async {
-                setState(() => _selectedLanguage = value!);
-                await _savePreference('language', value);
-                Navigator.pop(context);
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Language changed to $value'),
-                    backgroundColor: AppTheme.primaryGreen,
-                  ),
-                );
-              },
-            ),
-            RadioListTile<String>(
-              title: const Text('Kinyarwanda'),
-              value: 'Kinyarwanda',
-              groupValue: _selectedLanguage,
-              onChanged: (value) async {
-                setState(() => _selectedLanguage = value!);
-                await _savePreference('language', value);
-                Navigator.pop(context);
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Language changed to $value'),
-                    backgroundColor: AppTheme.primaryGreen,
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showChangePasswordDialog(BuildContext context) {
     final currentPasswordController = TextEditingController();
     final newPasswordController = TextEditingController();
@@ -421,14 +311,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 try {
                   final user = FirebaseAuth.instance.currentUser;
                   if (user != null && user.email != null) {
-                    // Re-authenticate user
                     final credential = EmailAuthProvider.credential(
                       email: user.email!,
                       password: currentPasswordController.text,
                     );
                     await user.reauthenticateWithCredential(credential);
-
-                    // Update password
                     await user.updatePassword(newPasswordController.text);
 
                     Navigator.pop(context);

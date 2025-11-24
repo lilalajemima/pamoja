@@ -19,16 +19,18 @@ class OpportunityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor, // FIXED: Use theme card color
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: isDarkMode ? 0.3 : 0.05), // FIXED
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -50,14 +52,14 @@ class OpportunityCard extends StatelessWidget {
                     fit: BoxFit.cover,
                     placeholder: (context, url) => Container(
                       height: 200,
-                      color: AppTheme.lightGray,
+                      color: isDarkMode ? AppTheme.darkCard : AppTheme.lightGray, // FIXED
                       child: const Center(
                         child: CircularProgressIndicator(),
                       ),
                     ),
                     errorWidget: (context, url, error) => Container(
                       height: 200,
-                      color: AppTheme.lightGray,
+                      color: isDarkMode ? AppTheme.darkCard : AppTheme.lightGray, // FIXED
                       child: const Icon(Icons.image_not_supported),
                     ),
                   ),
@@ -91,11 +93,11 @@ class OpportunityCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isDarkMode ? AppTheme.darkCard : Colors.white, // FIXED
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 8,
                           ),
                         ],
@@ -131,7 +133,7 @@ class OpportunityCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.location_on_outlined,
                         size: 16,
                         color: AppTheme.mediumGray,
@@ -152,7 +154,7 @@ class OpportunityCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.access_time,
                         size: 16,
                         color: AppTheme.mediumGray,

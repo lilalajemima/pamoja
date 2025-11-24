@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
 import '../../blocs/opportunities/opportunities_bloc.dart';
 import '../../blocs/tracker/tracker_bloc.dart';
@@ -51,14 +52,7 @@ class OpportunityDetailScreen extends StatelessWidget {
                   onPressed: () => context.pop(),
                 ),
                 flexibleSpace: FlexibleSpaceBar(
-                  background: CachedNetworkImage(
-                    imageUrl: opportunity.imageUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: AppTheme.lightGray,
-                      child: const Center(child: CircularProgressIndicator()),
-                    ),
-                  ),
+                  background: _buildImageWidget(opportunity.imageUrl),
                 ),
               ),
               SliverToBoxAdapter(
@@ -158,9 +152,7 @@ class OpportunityDetailScreen extends StatelessWidget {
               }
             },
             builder: (context, trackerState) {
-              // Get opportunity data from OpportunitiesBloc
-              final opportunitiesState =
-                  context.read<OpportunitiesBloc>().state;
+              final opportunitiesState = context.read<OpportunitiesBloc>().state;
 
               if (opportunitiesState is! OpportunitiesLoaded) {
                 return const SizedBox();
@@ -197,6 +189,67 @@ class OpportunityDetailScreen extends StatelessWidget {
               );
             },
           ),
+        ),
+      ),
+    );
+  }
+
+  // Safe image widget builder
+  Widget _buildImageWidget(String imageUrl) {
+    // Check if it's a base64 image
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        // Extract the base64 part after the comma
+        final base64String = imageUrl.split(',')[1];
+        final bytes = base64Decode(base64String);
+        
+        return Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            print('Error loading base64 image: $error');
+            return _buildErrorWidget();
+          },
+        );
+      } catch (e) {
+        print('Error decoding base64 image: $e');
+        return _buildErrorWidget();
+      }
+    }
+    
+    // It's a network URL
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        color: AppTheme.lightGray,
+        child: const Center(child: CircularProgressIndicator()),
+      ),
+      errorWidget: (context, url, error) {
+        print('Error loading network image: $error');
+        return _buildErrorWidget();
+      },
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Container(
+      color: AppTheme.lightGray,
+      child: const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.image_not_supported,
+              size: 64,
+              color: AppTheme.mediumGray,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Image not available',
+              style: TextStyle(color: AppTheme.mediumGray),
+            ),
+          ],
         ),
       ),
     );

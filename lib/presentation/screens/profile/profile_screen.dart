@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -51,11 +50,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final bytes = await image.readAsBytes();
       final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
 
-      context.read<ProfileBloc>().add(
-            UpdateProfile(
-              profileState.profile.copyWith(avatarUrl: base64Image),
-            ),
-          );
+      if (mounted) {
+        context.read<ProfileBloc>().add(
+              UpdateProfile(
+                profileState.profile.copyWith(avatarUrl: base64Image),
+              ),
+            );
+      }
 
       setState(() => _isUploadingImage = false);
 
@@ -125,9 +126,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final updatedCertificates = List<String>.from(profileState.profile.certificates);
         updatedCertificates.add(base64Image);
         
-        context.read<ProfileBloc>().add(
-          UpdateProfile(profileState.profile.copyWith(certificates: updatedCertificates)),
-        );
+        if (mounted) {
+          context.read<ProfileBloc>().add(
+            UpdateProfile(profileState.profile.copyWith(certificates: updatedCertificates)),
+          );
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -176,9 +179,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final updatedCertificates = List<String>.from(profileState.profile.certificates);
           updatedCertificates.add(pdfIndicator);
           
-          context.read<ProfileBloc>().add(
-            UpdateProfile(profileState.profile.copyWith(certificates: updatedCertificates)),
-          );
+          if (mounted) {
+            context.read<ProfileBloc>().add(
+              UpdateProfile(profileState.profile.copyWith(certificates: updatedCertificates)),
+            );
+          }
 
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -204,11 +209,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: AppTheme.lightGray,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // FIXED: Use theme background
       appBar: AppBar(
         title: const Text('Profile'),
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor, // FIXED
         elevation: 0,
         actions: [
           IconButton(
@@ -254,7 +261,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   // Profile Header Section
                   Container(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor, // FIXED: Use theme card color
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Column(
                       children: [
@@ -264,7 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ? Container(
                                     width: 120,
                                     height: 120,
-                                    decoration: BoxDecoration(
+                                    decoration: const BoxDecoration(
                                       color: AppTheme.lightGreen,
                                       shape: BoxShape.circle,
                                     ),
@@ -484,7 +491,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required Widget child,
   }) {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardColor, // FIXED: Use theme card color
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -513,6 +520,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildVolunteeringHistorySection(BuildContext context, profile) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: _getVolunteeringHistory(),
       builder: (context, snapshot) {
@@ -545,7 +554,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: AppTheme.lightGray,
+                        color: isDarkMode ? AppTheme.darkCard : AppTheme.lightGray, // FIXED
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(

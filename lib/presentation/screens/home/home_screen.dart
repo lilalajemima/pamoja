@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../blocs/opportunities/opportunities_bloc.dart';
-import '../../widgets/opportunity_card.dart';
 import '../../widgets/category_chip.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -38,12 +37,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // FIXED
       appBar: AppBar(
         title: const Text('Pamoja'),
         centerTitle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor, // FIXED
         elevation: 0,
         actions: [
           IconButton(
@@ -73,11 +74,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           
           // Tabs
           Container(
-            color: Colors.white,
+            color: Theme.of(context).scaffoldBackgroundColor, // FIXED
             child: TabBar(
               controller: _tabController,
-              labelColor: Colors.white,
-              unselectedLabelColor: AppTheme.darkText,
+              labelColor: isDarkMode ? AppTheme.darkBackground : Colors.white, // FIXED
+              unselectedLabelColor: isDarkMode ? AppTheme.lightText : AppTheme.darkText, // FIXED
               indicatorSize: TabBarIndicatorSize.label,
               indicator: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
@@ -100,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       borderRadius: BorderRadius.circular(20),
                       color: _tabController.index == 0
                           ? AppTheme.primaryGreen
-                          : AppTheme.lightGreen.withOpacity(0.3),
+                          : AppTheme.lightGreen.withValues(alpha: 0.3),
                     ),
                     child: const Text('Recommended'),
                   ),
@@ -112,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       borderRadius: BorderRadius.circular(20),
                       color: _tabController.index == 1
                           ? AppTheme.primaryGreen
-                          : AppTheme.lightGreen.withOpacity(0.3),
+                          : AppTheme.lightGreen.withValues(alpha: 0.3),
                     ),
                     child: const Text('Upcoming'),
                   ),
@@ -124,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       borderRadius: BorderRadius.circular(20),
                       color: _tabController.index == 2
                           ? AppTheme.primaryGreen
-                          : AppTheme.lightGreen.withOpacity(0.3),
+                          : AppTheme.lightGreen.withValues(alpha: 0.3),
                     ),
                     child: const Text('Saved'),
                   ),
@@ -201,7 +202,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline,
+                        const Icon(Icons.error_outline,
                             size: 64, color: AppTheme.mediumGray),
                         const SizedBox(height: 16),
                         Text(state.message),
@@ -232,7 +233,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.search_off,
+                          const Icon(Icons.search_off,
                               size: 64, color: AppTheme.mediumGray),
                           const SizedBox(height: 16),
                           Text(
@@ -331,13 +332,18 @@ class _OpportunityCompactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor, // FIXED
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppTheme.lightGray, width: 1),
+          border: Border.all(
+            color: isDarkMode ? AppTheme.darkBorder : AppTheme.lightGray, // FIXED
+            width: 1,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,7 +386,7 @@ class _OpportunityCompactCard extends StatelessWidget {
               height: 120,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: AppTheme.lightGray,
+                color: isDarkMode ? AppTheme.darkCard : AppTheme.lightGray, // FIXED
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(12),
                 ),
@@ -435,7 +441,7 @@ class _OpportunityCompactCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.location_on_outlined,
                         size: 14,
                         color: AppTheme.mediumGray,
@@ -457,7 +463,7 @@ class _OpportunityCompactCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.access_time,
                         size: 14,
                         color: AppTheme.mediumGray,
