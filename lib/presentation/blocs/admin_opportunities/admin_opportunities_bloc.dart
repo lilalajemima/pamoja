@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/opportunity.dart';
+import '../../../core/services/notification_service.dart'; // ADDED
 
 // Events
 abstract class AdminOpportunitiesEvent extends Equatable {
@@ -80,9 +81,13 @@ class AdminOpportunityOperationSuccess extends AdminOpportunitiesState {
 class AdminOpportunitiesBloc
     extends Bloc<AdminOpportunitiesEvent, AdminOpportunitiesState> {
   final FirebaseFirestore _firestore;
+  final NotificationService _notificationService; // ADDED
 
-  AdminOpportunitiesBloc({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance,
+  AdminOpportunitiesBloc({
+    FirebaseFirestore? firestore,
+    NotificationService? notificationService, // ADDED
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _notificationService = notificationService ?? NotificationService(), // ADDED
         super(AdminOpportunitiesInitial()) {
     on<LoadAdminOpportunities>(_onLoadAdminOpportunities);
     on<CreateOpportunity>(_onCreateOpportunity);
@@ -134,6 +139,13 @@ class AdminOpportunitiesBloc
         'date': event.opportunity.date?.toIso8601String(),
         'createdAt': FieldValue.serverTimestamp(),
       });
+
+      // NOTIFY ALL USERS ABOUT THE NEW OPPORTUNITY - ADDED
+      await _notificationService.notifyNewOpportunity(
+        opportunityTitle: event.opportunity.title,
+        opportunityId: docRef.id,
+        imageUrl: event.opportunity.imageUrl,
+      );
 
       // Reload opportunities
       final querySnapshot = await _firestore

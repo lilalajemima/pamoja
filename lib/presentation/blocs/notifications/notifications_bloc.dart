@@ -1,4 +1,5 @@
 // lib/presentation/blocs/notifications/notifications_bloc.dart
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -12,6 +13,10 @@ abstract class NotificationsEvent extends Equatable {
 }
 
 class LoadNotifications extends NotificationsEvent {}
+
+class StartListening extends NotificationsEvent {}
+
+class StopListening extends NotificationsEvent {}
 
 class MarkAsRead extends NotificationsEvent {
   final String notificationId;
@@ -69,6 +74,8 @@ class NotificationsError extends NotificationsState {
 class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+  StreamSubscription<QuerySnapshot>? _notificationsSubscription;
+  bool _isListening = false;
 
   NotificationsBloc({
     FirebaseFirestore? firestore,
@@ -77,9 +84,102 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         _auth = auth ?? FirebaseAuth.instance,
         super(NotificationsInitial()) {
     on<LoadNotifications>(_onLoadNotifications);
+    on<StartListening>(_onStartListening);
+    on<StopListening>(_onStopListening);
     on<MarkAsRead>(_onMarkAsRead);
     on<MarkAllAsRead>(_onMarkAllAsRead);
     on<DeleteNotification>(_onDeleteNotification);
+  }
+
+  Future<void> _onStartListening(
+    StartListening event,
+    Emitter<NotificationsState> emit,
+  ) async {
+    if (_isListening) return;
+    
+    _isListening = true;
+    final user = _auth.currentUser;
+    if (user == null) {
+      emit(NotificationsError('No user logged in'));
+      return;
+    }
+
+    // Cancel existing subscription if any
+    await _notificationsSubscription?.cancel();
+
+    _notificationsSubscription = _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: user.uid)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .listen((querySnapshot) {
+      _handleNotificationsSnapshot(querySnapshot);
+    }, onError: (error) {
+      if (_isListening) {
+        add(LoadNotifications()); // Fallback to manual load
+      }
+    });
+  }
+
+  Future<void> _onStopListening(
+    StopListening event,
+    Emitter<NotificationsState> emit,
+  ) async {
+    _isListening = false;
+    await _notificationsSubscription?.cancel();
+    _notificationsSubscription = null;
+  }
+
+  void _handleNotificationsSnapshot(QuerySnapshot querySnapshot) {
+    final notifications = querySnapshot.docs.map((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      
+      DateTime timestamp;
+      if (data['timestamp'] is Timestamp) {
+        timestamp = (data['timestamp'] as Timestamp).toDate();
+      } else if (data['timestamp'] is String) {
+        timestamp = DateTime.parse(data['timestamp']);
+      } else {
+        timestamp = DateTime.now();
+      }
+
+      return NotificationModel(
+        id: doc.id,
+        userId: data['userId'] ?? '',
+        type: _parseNotificationType(data['type']),
+        title: data['title'] ?? '',
+        message: data['message'] ?? '',
+        read: data['read'] ?? false,
+        timestamp: timestamp,
+        relatedId: data['relatedId'],
+        imageUrl: data['imageUrl'],
+      );
+    }).toList();
+
+    final unreadCount = notifications.where((n) => !n.read).length;
+
+    // Emit the new state
+    if (state is! NotificationsLoaded || 
+        (state as NotificationsLoaded).notifications.length != notifications.length) {
+      // Use a small delay to ensure we're in a valid state to emit
+      Future.microtask(() {
+        if (_isListening) {
+          // We need to access the emitter, so we'll use add instead
+          add(LoadNotifications());
+        }
+      });
+    }
+  }
+
+  NotificationType _parseNotificationType(String typeString) {
+    try {
+      return NotificationType.values.firstWhere(
+        (e) => e.toString() == 'NotificationType.$typeString',
+        orElse: () => NotificationType.opportunityPosted,
+      );
+    } catch (e) {
+      return NotificationType.opportunityPosted;
+    }
   }
 
   Future<void> _onLoadNotifications(
@@ -102,7 +202,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
           .get();
 
       final notifications = querySnapshot.docs.map((doc) {
-        final data = doc.data();
+        final data = doc.data() as Map<String, dynamic>;
         
         DateTime timestamp;
         if (data['timestamp'] is Timestamp) {
@@ -116,10 +216,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         return NotificationModel(
           id: doc.id,
           userId: data['userId'] ?? '',
-          type: NotificationType.values.firstWhere(
-            (e) => e.toString() == 'NotificationType.${data['type']}',
-            orElse: () => NotificationType.opportunityPosted,
-          ),
+          type: _parseNotificationType(data['type'] ?? 'opportunityPosted'),
           title: data['title'] ?? '',
           message: data['message'] ?? '',
           read: data['read'] ?? false,
@@ -150,6 +247,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
           .doc(event.notificationId)
           .update({'read': true});
 
+      // Reload to reflect changes
       add(LoadNotifications());
     } catch (e) {
       emit(NotificationsError('Failed to mark as read: ${e.toString()}'));
@@ -196,5 +294,12 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     } catch (e) {
       emit(NotificationsError('Failed to delete notification: ${e.toString()}'));
     }
+  }
+
+  @override
+  Future<void> close() {
+    _isListening = false;
+    _notificationsSubscription?.cancel();
+    return super.close();
   }
 }

@@ -3,6 +3,7 @@ import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/volunteer_activity.dart';
+import '../../../core/services/notification_service.dart'; // ADDED
 
 // Events
 abstract class TrackerEvent extends Equatable {
@@ -32,11 +33,18 @@ class ApplyToOpportunity extends TrackerEvent {
 class UpdateActivityStatus extends TrackerEvent {
   final String activityId;
   final ActivityStatus newStatus;
+  final String opportunityTitle; // ADDED
+  final String opportunityId; // ADDED
 
-  UpdateActivityStatus(this.activityId, this.newStatus);
+  UpdateActivityStatus(
+    this.activityId, 
+    this.newStatus, {
+    required this.opportunityTitle, // ADDED
+    required this.opportunityId, // ADDED
+  });
 
   @override
-  List<Object?> get props => [activityId, newStatus];
+  List<Object?> get props => [activityId, newStatus, opportunityTitle, opportunityId];
 }
 
 // States
@@ -90,12 +98,15 @@ class TrackerOperationSuccess extends TrackerState {
 class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
+  final NotificationService _notificationService; // ADDED
 
   TrackerBloc({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
+    NotificationService? notificationService, // ADDED
   })  : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
+        _notificationService = notificationService ?? NotificationService(), // ADDED
         super(TrackerInitial()) {
     on<LoadActivities>(_onLoadActivities);
     on<ApplyToOpportunity>(_onApplyToOpportunity);
@@ -262,6 +273,17 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
       }
 
       await _firestore.collection('applications').doc(event.activityId).update(updateData);
+
+      // SEND NOTIFICATION TO USER ABOUT APPLICATION STATUS - ADDED
+      if (event.newStatus == ActivityStatus.confirmed || 
+          event.newStatus == ActivityStatus.rejected) {
+        await _notificationService.notifyApplicationStatus(
+          userId: user.uid,
+          opportunityTitle: event.opportunityTitle,
+          accepted: event.newStatus == ActivityStatus.confirmed,
+          opportunityId: event.opportunityId,
+        );
+      }
 
       if (event.newStatus == ActivityStatus.completed) {
         await _firestore.collection('users').doc(user.uid).update({

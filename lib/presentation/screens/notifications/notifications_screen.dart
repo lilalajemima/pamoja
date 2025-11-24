@@ -18,7 +18,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
+    // Load initial notifications and start real-time listening
     context.read<NotificationsBloc>().add(LoadNotifications());
+    context.read<NotificationsBloc>().add(StartListening());
+  }
+
+  @override
+  void dispose() {
+    // Stop real-time listening when screen closes
+    context.read<NotificationsBloc>().add(StopListening());
+    super.dispose();
   }
 
   @override

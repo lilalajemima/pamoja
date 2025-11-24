@@ -13,6 +13,7 @@ import '../../../presentation/screens/tracker/tracker_screen.dart';
 import '../../../presentation/screens/community/community_screen.dart';
 import '../../../presentation/screens/profile/profile_screen.dart';
 import '../../../presentation/screens/profile/settings_screen.dart';
+import '../../../presentation/screens/notifications/notifications_screen.dart'; // ADDED
 import '../../../presentation/screens/admin/admin_login_screen.dart';
 import '../../../presentation/screens/admin/admin_dashboard_screen.dart';
 import '../../../presentation/screens/admin/opportunity_form_screen.dart';
@@ -32,6 +33,7 @@ class AppRouter {
   static const String profile = '/main/profile';
   static const String opportunityDetail = '/opportunity/:id';
   static const String settings = '/settings';
+  static const String notifications = '/notifications'; // ADDED
   
   // Admin routes
   static const String adminLogin = '/admin/login';
@@ -52,6 +54,7 @@ class AppRouter {
                         state.matchedLocation == '/signup' ||
                         state.matchedLocation == '/verify-email';
       final isAdminPage = state.matchedLocation.startsWith('/admin');
+      final isNotificationsPage = state.matchedLocation == '/notifications'; // ADDED
       
       // If authenticated and trying to access auth pages, redirect to home
       if (authState is Authenticated && (isAuthPage || isOnboarding)) {
@@ -59,7 +62,7 @@ class AppRouter {
       }
       
       // If not authenticated and trying to access protected pages
-      if (authState is Unauthenticated && !isAuthPage && !isOnboarding && !isAdminPage) {
+      if (authState is Unauthenticated && !isAuthPage && !isOnboarding && !isAdminPage && !isNotificationsPage) {
         return hasSeenOnboarding ? login : onboarding;
       }
       
@@ -97,6 +100,12 @@ class AppRouter {
           final email = state.uri.queryParameters['email'] ?? '';
           return EmailVerificationScreen(email: email);
         },
+      ),
+      
+      // Notifications Route - ADDED
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const NotificationsScreen(),
       ),
       
       // Admin Routes

@@ -12,7 +12,8 @@ import 'presentation/blocs/tracker/tracker_bloc.dart';
 import 'presentation/blocs/community/community_bloc.dart';
 import 'presentation/blocs/admin_opportunities/admin_opportunities_bloc.dart';
 import 'presentation/blocs/theme/theme_cubit.dart';
-import 'presentation/blocs/notifications/notifications_bloc.dart'; // ADDED
+import 'presentation/blocs/notifications/notifications_bloc.dart';
+import 'core/services/notification_service.dart'; // ADDED
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,11 +37,15 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (_) => AdminAuthBloc()),
         BlocProvider(create: (_) => OpportunitiesBloc()),
         BlocProvider(create: (_) => ProfileBloc()),
-        BlocProvider(create: (_) => TrackerBloc()),
+        BlocProvider(create: (_) => TrackerBloc(
+          notificationService: NotificationService(), // ADDED
+        )),
         BlocProvider(create: (_) => CommunityBloc()),
-        BlocProvider(create: (_) => AdminOpportunitiesBloc()),
+        BlocProvider(create: (_) => AdminOpportunitiesBloc(
+          notificationService: NotificationService(), // ADDED
+        )),
         BlocProvider(create: (_) => ThemeCubit()),
-        BlocProvider(create: (_) => NotificationsBloc()), // ADDED
+        BlocProvider(create: (_) => NotificationsBloc()),
       ],
       child: BlocBuilder<ThemeCubit, bool>(
         builder: (context, isDarkMode) {
