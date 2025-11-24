@@ -18,6 +18,15 @@ class StartListening extends NotificationsEvent {}
 
 class StopListening extends NotificationsEvent {}
 
+class NotificationsUpdated extends NotificationsEvent {
+  final List<NotificationModel> notifications;
+
+  NotificationsUpdated(this.notifications);
+
+  @override
+  List<Object?> get props => [notifications];
+}
+
 class MarkAsRead extends NotificationsEvent {
   final String notificationId;
 
@@ -75,7 +84,6 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   StreamSubscription<QuerySnapshot>? _notificationsSubscription;
-  bool _isListening = false;
 
   NotificationsBloc({
     FirebaseFirestore? firestore,
@@ -86,6 +94,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<LoadNotifications>(_onLoadNotifications);
     on<StartListening>(_onStartListening);
     on<StopListening>(_onStopListening);
+    on<NotificationsUpdated>(_onNotificationsUpdated);
     on<MarkAsRead>(_onMarkAsRead);
     on<MarkAllAsRead>(_onMarkAllAsRead);
     on<DeleteNotification>(_onDeleteNotification);
@@ -95,14 +104,13 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     StartListening event,
     Emitter<NotificationsState> emit,
   ) async {
-    if (_isListening) return;
-    
-    _isListening = true;
     final user = _auth.currentUser;
     if (user == null) {
       emit(NotificationsError('No user logged in'));
       return;
     }
+
+    print('🔔 Starting notifications listener for user: ${user.uid}');
 
     // Cancel existing subscription if any
     await _notificationsSubscription?.cancel();
@@ -112,26 +120,41 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         .where('userId', isEqualTo: user.uid)
         .orderBy('timestamp', descending: true)
         .snapshots()
-        .listen((querySnapshot) {
-      _handleNotificationsSnapshot(querySnapshot);
-    }, onError: (error) {
-      if (_isListening) {
-        add(LoadNotifications()); // Fallback to manual load
-      }
-    });
+        .listen(
+          (querySnapshot) {
+            print('🔔 Received ${querySnapshot.docs.length} notifications');
+            final notifications = _parseNotifications(querySnapshot);
+            add(NotificationsUpdated(notifications));
+          },
+          onError: (error) {
+            print('❌ Error in notifications stream: $error');
+            add(LoadNotifications()); // Fallback to manual load
+          },
+        );
   }
 
   Future<void> _onStopListening(
     StopListening event,
     Emitter<NotificationsState> emit,
   ) async {
-    _isListening = false;
+    print('🔕 Stopping notifications listener');
     await _notificationsSubscription?.cancel();
     _notificationsSubscription = null;
   }
 
-  void _handleNotificationsSnapshot(QuerySnapshot querySnapshot) {
-    final notifications = querySnapshot.docs.map((doc) {
+  void _onNotificationsUpdated(
+    NotificationsUpdated event,
+    Emitter<NotificationsState> emit,
+  ) {
+    final unreadCount = event.notifications.where((n) => !n.read).length;
+    emit(NotificationsLoaded(
+      notifications: event.notifications,
+      unreadCount: unreadCount,
+    ));
+  }
+
+  List<NotificationModel> _parseNotifications(QuerySnapshot querySnapshot) {
+    return querySnapshot.docs.map((doc) {
       final data = doc.data() as Map<String, dynamic>;
       
       DateTime timestamp;
@@ -155,23 +178,11 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         imageUrl: data['imageUrl'],
       );
     }).toList();
-
-    final unreadCount = notifications.where((n) => !n.read).length;
-
-    // Emit the new state
-    if (state is! NotificationsLoaded || 
-        (state as NotificationsLoaded).notifications.length != notifications.length) {
-      // Use a small delay to ensure we're in a valid state to emit
-      Future.microtask(() {
-        if (_isListening) {
-          // We need to access the emitter, so we'll use add instead
-          add(LoadNotifications());
-        }
-      });
-    }
   }
 
-  NotificationType _parseNotificationType(String typeString) {
+  NotificationType _parseNotificationType(String? typeString) {
+    if (typeString == null) return NotificationType.opportunityPosted;
+    
     try {
       return NotificationType.values.firstWhere(
         (e) => e.toString() == 'NotificationType.$typeString',
@@ -195,44 +206,27 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         return;
       }
 
+      print('📥 Loading notifications for user: ${user.uid}');
+
       final querySnapshot = await _firestore
           .collection('notifications')
           .where('userId', isEqualTo: user.uid)
           .orderBy('timestamp', descending: true)
           .get();
 
-      final notifications = querySnapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        
-        DateTime timestamp;
-        if (data['timestamp'] is Timestamp) {
-          timestamp = (data['timestamp'] as Timestamp).toDate();
-        } else if (data['timestamp'] is String) {
-          timestamp = DateTime.parse(data['timestamp']);
-        } else {
-          timestamp = DateTime.now();
-        }
+      print('📥 Found ${querySnapshot.docs.length} notifications');
 
-        return NotificationModel(
-          id: doc.id,
-          userId: data['userId'] ?? '',
-          type: _parseNotificationType(data['type'] ?? 'opportunityPosted'),
-          title: data['title'] ?? '',
-          message: data['message'] ?? '',
-          read: data['read'] ?? false,
-          timestamp: timestamp,
-          relatedId: data['relatedId'],
-          imageUrl: data['imageUrl'],
-        );
-      }).toList();
-
+      final notifications = _parseNotifications(querySnapshot);
       final unreadCount = notifications.where((n) => !n.read).length;
+
+      print('📥 Unread count: $unreadCount');
 
       emit(NotificationsLoaded(
         notifications: notifications,
         unreadCount: unreadCount,
       ));
     } catch (e) {
+      print('❌ Error loading notifications: $e');
       emit(NotificationsError('Failed to load notifications: ${e.toString()}'));
     }
   }
@@ -242,6 +236,8 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     Emitter<NotificationsState> emit,
   ) async {
     try {
+      print('✅ Marking notification as read: ${event.notificationId}');
+      
       await _firestore
           .collection('notifications')
           .doc(event.notificationId)
@@ -250,6 +246,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       // Reload to reflect changes
       add(LoadNotifications());
     } catch (e) {
+      print('❌ Error marking notification as read: $e');
       emit(NotificationsError('Failed to mark as read: ${e.toString()}'));
     }
   }
@@ -261,6 +258,8 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     try {
       final user = _auth.currentUser;
       if (user == null) return;
+
+      print('✅ Marking all notifications as read for user: ${user.uid}');
 
       final batch = _firestore.batch();
       final querySnapshot = await _firestore
@@ -274,8 +273,11 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       }
 
       await batch.commit();
+      print('✅ Marked ${querySnapshot.docs.length} notifications as read');
+      
       add(LoadNotifications());
     } catch (e) {
+      print('❌ Error marking all as read: $e');
       emit(NotificationsError('Failed to mark all as read: ${e.toString()}'));
     }
   }
@@ -285,6 +287,8 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     Emitter<NotificationsState> emit,
   ) async {
     try {
+      print('🗑️ Deleting notification: ${event.notificationId}');
+      
       await _firestore
           .collection('notifications')
           .doc(event.notificationId)
@@ -292,13 +296,13 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
 
       add(LoadNotifications());
     } catch (e) {
+      print('❌ Error deleting notification: $e');
       emit(NotificationsError('Failed to delete notification: ${e.toString()}'));
     }
   }
 
   @override
   Future<void> close() {
-    _isListening = false;
     _notificationsSubscription?.cancel();
     return super.close();
   }

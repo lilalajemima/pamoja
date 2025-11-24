@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
 import '../../blocs/opportunities/opportunities_bloc.dart';
 import '../../widgets/category_chip.dart';
-import '../../widgets/notification_button.dart'; // ADDED
+import '../../widgets/notification_button.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -48,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
         actions: const [
-          NotificationButton(), // UPDATED: Use the reusable widget
+          NotificationButton(),
         ],
       ),
       body: Column(
@@ -310,7 +312,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 }
 
-// Compact card matching Figma design
+// Compact card with proper image loading
 class _OpportunityCompactCard extends StatelessWidget {
   final dynamic opportunity;
   final bool isSaved;
@@ -375,37 +377,8 @@ class _OpportunityCompactCard extends StatelessWidget {
               ),
             ),
             
-            // Image placeholder
-            Container(
-              height: 120,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: isDarkMode ? AppTheme.darkCard : AppTheme.lightGray,
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(12),
-                ),
-              ),
-              child: opportunity.imageUrl.isNotEmpty
-                  ? ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(12),
-                      ),
-                      child: Image.network(
-                        opportunity.imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Icon(Icons.image_not_supported,
-                                color: AppTheme.mediumGray),
-                          );
-                        },
-                      ),
-                    )
-                  : const Center(
-                      child: Icon(Icons.image_not_supported,
-                          color: AppTheme.mediumGray),
-                    ),
-            ),
+            // Image with proper loading
+            _buildImageWidget(context, opportunity.imageUrl),
             
             // Title and details
             Padding(
@@ -476,6 +449,82 @@ class _OpportunityCompactCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageWidget(BuildContext context, String imageUrl) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Check if it's a base64 image
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final base64String = imageUrl.split(',')[1];
+        final bytes = base64Decode(base64String);
+        
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(12),
+          ),
+          child: Image.memory(
+            bytes,
+            height: 120,
+            width: double.infinity,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              print('❌ Error loading base64 image: $error');
+              return _buildPlaceholder(context, isDarkMode);
+            },
+          ),
+        );
+      } catch (e) {
+        print('❌ Error decoding base64 image: $e');
+        return _buildPlaceholder(context, isDarkMode);
+      }
+    }
+    
+    // It's a network URL
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(
+        bottom: Radius.circular(12),
+      ),
+      child: CachedNetworkImage(
+        imageUrl: imageUrl,
+        height: 120,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(
+          height: 120,
+          width: double.infinity,
+          color: isDarkMode ? AppTheme.darkCard : AppTheme.lightGray,
+          child: const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        errorWidget: (context, url, error) {
+          print('❌ Error loading network image: $error');
+          return _buildPlaceholder(context, isDarkMode);
+        },
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder(BuildContext context, bool isDarkMode) {
+    return Container(
+      height: 120,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: isDarkMode ? AppTheme.darkCard : AppTheme.lightGray,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(12),
+        ),
+      ),
+      child: const Center(
+        child: Icon(
+          Icons.image_not_supported,
+          color: AppTheme.mediumGray,
+          size: 32,
         ),
       ),
     );

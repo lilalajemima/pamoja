@@ -2,7 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/opportunity.dart';
-import '../../../core/services/notification_service.dart'; // ADDED
+import '../../../core/services/notification_service.dart';
 
 // Events
 abstract class AdminOpportunitiesEvent extends Equatable {
@@ -81,13 +81,13 @@ class AdminOpportunityOperationSuccess extends AdminOpportunitiesState {
 class AdminOpportunitiesBloc
     extends Bloc<AdminOpportunitiesEvent, AdminOpportunitiesState> {
   final FirebaseFirestore _firestore;
-  final NotificationService _notificationService; // ADDED
+  final NotificationService _notificationService;
 
   AdminOpportunitiesBloc({
     FirebaseFirestore? firestore,
-    NotificationService? notificationService, // ADDED
+    NotificationService? notificationService,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _notificationService = notificationService ?? NotificationService(), // ADDED
+        _notificationService = notificationService ?? NotificationService(),
         super(AdminOpportunitiesInitial()) {
     on<LoadAdminOpportunities>(_onLoadAdminOpportunities);
     on<CreateOpportunity>(_onCreateOpportunity);
@@ -140,12 +140,17 @@ class AdminOpportunitiesBloc
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // NOTIFY ALL USERS ABOUT THE NEW OPPORTUNITY - ADDED
+      print('📢 Opportunity created with ID: ${docRef.id}');
+      print('📢 Sending notifications to all users...');
+
+      // Send notification to all users about new opportunity
       await _notificationService.notifyNewOpportunity(
         opportunityTitle: event.opportunity.title,
         opportunityId: docRef.id,
         imageUrl: event.opportunity.imageUrl,
       );
+
+      print('✅ Notifications sent successfully!');
 
       // Reload opportunities
       final querySnapshot = await _firestore
@@ -165,6 +170,7 @@ class AdminOpportunitiesBloc
         opportunities,
       ));
     } catch (e) {
+      print('❌ Error creating opportunity: $e');
       emit(AdminOpportunitiesError('Failed to create opportunity: ${e.toString()}'));
     }
   }

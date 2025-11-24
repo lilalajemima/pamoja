@@ -3,7 +3,7 @@ import 'package:equatable/equatable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../domain/models/volunteer_activity.dart';
-import '../../../core/services/notification_service.dart'; // ADDED
+import '../../../core/services/notification_service.dart';
 
 // Events
 abstract class TrackerEvent extends Equatable {
@@ -33,14 +33,14 @@ class ApplyToOpportunity extends TrackerEvent {
 class UpdateActivityStatus extends TrackerEvent {
   final String activityId;
   final ActivityStatus newStatus;
-  final String opportunityTitle; // ADDED
-  final String opportunityId; // ADDED
+  final String opportunityTitle;
+  final String opportunityId;
 
   UpdateActivityStatus(
     this.activityId, 
     this.newStatus, {
-    required this.opportunityTitle, // ADDED
-    required this.opportunityId, // ADDED
+    required this.opportunityTitle,
+    required this.opportunityId,
   });
 
   @override
@@ -98,15 +98,15 @@ class TrackerOperationSuccess extends TrackerState {
 class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
-  final NotificationService _notificationService; // ADDED
+  final NotificationService _notificationService;
 
   TrackerBloc({
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
-    NotificationService? notificationService, // ADDED
+    NotificationService? notificationService,
   })  : _auth = auth ?? FirebaseAuth.instance,
         _firestore = firestore ?? FirebaseFirestore.instance,
-        _notificationService = notificationService ?? NotificationService(), // ADDED
+        _notificationService = notificationService ?? NotificationService(),
         super(TrackerInitial()) {
     on<LoadActivities>(_onLoadActivities);
     on<ApplyToOpportunity>(_onApplyToOpportunity);
@@ -182,7 +182,6 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         );
       }).toList();
 
-      final now = DateTime.now();
       final upcoming = allActivities
           .where((a) =>
               a.status != ActivityStatus.completed &&
@@ -274,15 +273,19 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
 
       await _firestore.collection('applications').doc(event.activityId).update(updateData);
 
-      // SEND NOTIFICATION TO USER ABOUT APPLICATION STATUS - ADDED
+      // Send notification about application status change
       if (event.newStatus == ActivityStatus.confirmed || 
           event.newStatus == ActivityStatus.rejected) {
+        print('📢 Sending application status notification to user: ${user.uid}');
+        
         await _notificationService.notifyApplicationStatus(
           userId: user.uid,
           opportunityTitle: event.opportunityTitle,
           accepted: event.newStatus == ActivityStatus.confirmed,
           opportunityId: event.opportunityId,
         );
+        
+        print('✅ Application status notification sent!');
       }
 
       if (event.newStatus == ActivityStatus.completed) {
@@ -294,6 +297,7 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
 
       await _loadAndEmitActivities(emit, 'Status updated successfully!');
     } catch (e) {
+      print('❌ Error updating activity status: $e');
       emit(TrackerError('Failed to update status: ${e.toString()}'));
     }
   }
@@ -379,7 +383,7 @@ class TrackerBloc extends Bloc<TrackerEvent, TrackerState> {
         pastActivities: past,
       ));
     } catch (e) {
-      print('Load error: $e');
+      print('❌ Load error: $e');
       emit(TrackerError('Failed to reload activities: ${e.toString()}'));
     }
   }

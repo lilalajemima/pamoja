@@ -17,8 +17,6 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _notificationsEnabled = true;
-  bool _emailNotifications = true;
-  bool _inAppNotifications = true;
 
   @override
   void initState() {
@@ -30,8 +28,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _notificationsEnabled = prefs.getBool('notifications') ?? true;
-      _emailNotifications = prefs.getBool('emailNotifications') ?? true;
-      _inAppNotifications = prefs.getBool('inAppNotifications') ?? true;
     });
   }
 
@@ -57,8 +53,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Notifications Section
           _buildSectionHeader('Notifications'),
           _buildSwitchTile(
-            title: 'Enable Notifications',
-            subtitle: 'Receive all types of notifications',
+            title: 'In-App Notifications',
+            subtitle: 'Receive notifications within the app',
             value: _notificationsEnabled,
             onChanged: (value) {
               setState(() => _notificationsEnabled = value);
@@ -76,26 +72,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               );
             },
           ),
-          if (_notificationsEnabled) ...[
-            _buildSwitchTile(
-              title: 'In-App Notifications',
-              subtitle: 'Receive notifications within the app',
-              value: _inAppNotifications,
-              onChanged: (value) {
-                setState(() => _inAppNotifications = value);
-                _savePreference('inAppNotifications', value);
-              },
-            ),
-            _buildSwitchTile(
-              title: 'Email Notifications',
-              subtitle: 'Receive updates via email',
-              value: _emailNotifications,
-              onChanged: (value) {
-                setState(() => _emailNotifications = value);
-                _savePreference('emailNotifications', value);
-              },
-            ),
-          ],
           const Divider(),
           
           // Appearance Section
