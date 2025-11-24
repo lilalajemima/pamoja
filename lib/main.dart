@@ -12,6 +12,7 @@ import 'presentation/blocs/tracker/tracker_bloc.dart';
 import 'presentation/blocs/community/community_bloc.dart';
 import 'presentation/blocs/admin_opportunities/admin_opportunities_bloc.dart';
 import 'presentation/blocs/theme/theme_cubit.dart';
+import 'presentation/blocs/notifications/notifications_bloc.dart'; // ADDED
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +40,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (_) => CommunityBloc()),
         BlocProvider(create: (_) => AdminOpportunitiesBloc()),
         BlocProvider(create: (_) => ThemeCubit()),
+        BlocProvider(create: (_) => NotificationsBloc()), // ADDED
       ],
       child: BlocBuilder<ThemeCubit, bool>(
         builder: (context, isDarkMode) {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../blocs/opportunities/opportunities_bloc.dart';
 import '../../widgets/category_chip.dart';
+import '../../widgets/notification_button.dart'; // ADDED
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -40,21 +41,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor, // FIXED
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Pamoja'),
         centerTitle: true,
-        backgroundColor: Theme.of(context).appBarTheme.backgroundColor, // FIXED
+        backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications coming soon!')),
-              );
-            },
-          ),
+        actions: const [
+          NotificationButton(), // UPDATED: Use the reusable widget
         ],
       ),
       body: Column(
@@ -74,11 +68,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           
           // Tabs
           Container(
-            color: Theme.of(context).scaffoldBackgroundColor, // FIXED
+            color: Theme.of(context).scaffoldBackgroundColor,
             child: TabBar(
               controller: _tabController,
-              labelColor: isDarkMode ? AppTheme.darkBackground : Colors.white, // FIXED
-              unselectedLabelColor: isDarkMode ? AppTheme.lightText : AppTheme.darkText, // FIXED
+              labelColor: isDarkMode ? AppTheme.darkBackground : Colors.white,
+              unselectedLabelColor: isDarkMode ? AppTheme.lightText : AppTheme.darkText,
               indicatorSize: TabBarIndicatorSize.label,
               indicator: BoxDecoration(
                 borderRadius: BorderRadius.circular(20),
@@ -338,10 +332,10 @@ class _OpportunityCompactCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor, // FIXED
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isDarkMode ? AppTheme.darkBorder : AppTheme.lightGray, // FIXED
+            color: isDarkMode ? AppTheme.darkBorder : AppTheme.lightGray,
             width: 1,
           ),
         ),
@@ -386,7 +380,7 @@ class _OpportunityCompactCard extends StatelessWidget {
               height: 120,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: isDarkMode ? AppTheme.darkCard : AppTheme.lightGray, // FIXED
+                color: isDarkMode ? AppTheme.darkCard : AppTheme.lightGray,
                 borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(12),
                 ),
