@@ -112,6 +112,37 @@ void main() {
           ),
         ],
       );
+
+      blocTest<TrackerBloc, TrackerState>(
+        'emits TrackerError when Firestore query fails',
+        build: () {
+          final mockApplicationsCollection = MockCollectionReference();
+          final mockQuery1 = MockQuery();
+          final mockQuery2 = MockQuery();
+
+          when(() => mockFirestore.collection('applications')).thenReturn(mockApplicationsCollection);
+          when(() => mockApplicationsCollection.where('userId', isEqualTo: 'test-user-id'))
+              .thenReturn(mockQuery1);
+          when(() => mockQuery1.orderBy('appliedAt', descending: true))
+              .thenReturn(mockQuery2);
+          when(() => mockQuery2.get()).thenThrow(Exception('Firestore error'));
+
+          return TrackerBloc(
+            auth: mockAuth,
+            firestore: mockFirestore,
+            notificationService: mockNotificationService,
+          );
+        },
+        act: (bloc) => bloc.add(LoadActivities()),
+        expect: () => [
+          isA<TrackerLoading>(),
+          isA<TrackerError>().having(
+            (s) => s.message,
+            'error message',
+            'Failed to load activities: Exception: Firestore error',
+          ),
+        ],
+      );
     });
 
     group('ApplyToOpportunity', () {
@@ -192,6 +223,59 @@ void main() {
         expect: () => [
           isA<TrackerOperationSuccess>()
               .having((s) => s.message, 'success message', 'Application submitted successfully!'),
+        ],
+      );
+
+      blocTest<TrackerBloc, TrackerState>(
+        'emits TrackerError when user already applied',
+        build: () {
+          final mockUsersCollection = MockCollectionReference();
+          final mockApplicationsCollection = MockCollectionReference();
+          final mockUserDocRef = MockDocumentReference();
+          final mockUserDoc = MockDocumentSnapshot();
+          final mockExistingQuery1 = MockQuery();
+          final mockExistingQuery2 = MockQuery();
+          final mockExistingSnapshot = MockQuerySnapshot();
+          final mockExistingDoc = MockQueryDocumentSnapshot();
+
+          when(() => mockExistingDoc.id).thenReturn('existing-doc');
+          when(() => mockExistingSnapshot.docs).thenReturn([mockExistingDoc]);
+
+          when(() => mockFirestore.collection('users')).thenReturn(mockUsersCollection);
+          when(() => mockUsersCollection.doc('test-user-id')).thenReturn(mockUserDocRef);
+          when(() => mockUserDocRef.get()).thenAnswer((_) async => mockUserDoc);
+          when(() => mockUserDoc.data()).thenReturn({
+            'name': 'Test User',
+            'email': 'test@example.com',
+          });
+
+          when(() => mockFirestore.collection('applications')).thenReturn(mockApplicationsCollection);
+          when(() => mockApplicationsCollection.where('userId', isEqualTo: 'test-user-id'))
+              .thenReturn(mockExistingQuery1);
+          when(() => mockExistingQuery1.where('opportunityId', isEqualTo: 'opp-1'))
+              .thenReturn(mockExistingQuery2);
+          when(() => mockExistingQuery2.get()).thenAnswer((_) async => mockExistingSnapshot);
+
+          return TrackerBloc(
+            auth: mockAuth,
+            firestore: mockFirestore,
+            notificationService: mockNotificationService,
+          );
+        },
+        act: (bloc) => bloc.add(
+          ApplyToOpportunity(
+            opportunityId: 'opp-1',
+            opportunityTitle: 'Beach Cleanup',
+            description: 'Clean the beach',
+            imageUrl: 'https://example.com/beach.jpg',
+          ),
+        ),
+        expect: () => [
+          isA<TrackerError>().having(
+            (s) => s.message,
+            'error message',
+            'You have already applied to this opportunity',
+          ),
         ],
       );
     });
