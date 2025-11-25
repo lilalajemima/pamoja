@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart'; // ADDED
+import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
 import '../../blocs/tracker/tracker_bloc.dart';
-import '../../blocs/notifications/notifications_bloc.dart'; // ADDED
+import '../../blocs/notifications/notifications_bloc.dart';
 import '../../../domain/models/volunteer_activity.dart';
 
 class TrackerScreen extends StatefulWidget {
@@ -30,14 +31,12 @@ class _TrackerScreenState extends State<TrackerScreen> {
     );
   }
 
-  // ==================== APP BAR ====================
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       title: const Text('Tracker'),
       backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
       elevation: 0,
       actions: [
-        // UPDATED: Make notifications button functional
         BlocBuilder<NotificationsBloc, NotificationsState>(
           builder: (context, state) {
             final unreadCount = state is NotificationsLoaded ? state.unreadCount : 0;
@@ -93,7 +92,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
     );
   }
 
-  // ==================== BODY ====================
   Widget _buildBody(BuildContext context) {
     return BlocConsumer<TrackerBloc, TrackerState>(
       listener: _handleStateChanges,
@@ -111,7 +109,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
     );
   }
 
-  // ==================== STATE HANDLERS ====================
   void _handleStateChanges(BuildContext context, TrackerState state) {
     if (state is TrackerOperationSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -143,7 +140,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
     );
   }
 
-  // ==================== ACTIVITIES LIST ====================
   Widget _buildActivitiesList(BuildContext context, TrackerState state) {
     final upcomingActivities = _getUpcomingActivities(state);
     final pastActivities = _getPastActivities(state);
@@ -159,7 +155,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Upcoming Section
               _buildSectionHeader(context, 'Upcoming'),
               const SizedBox(height: 16),
               _buildActivitiesSection(
@@ -169,8 +164,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
                 'No upcoming activities',
               ),
               const SizedBox(height: 32),
-
-              // Past Section
               _buildSectionHeader(context, 'Past'),
               const SizedBox(height: 16),
               _buildActivitiesSection(
@@ -205,7 +198,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
     return [];
   }
 
-  // ==================== SECTION BUILDERS ====================
   Widget _buildSectionHeader(BuildContext context, String title) {
     return Text(
       title,
@@ -268,7 +260,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
     );
   }
 
-  // ==================== ACTIVITY DETAILS MODAL ====================
   void _showActivityDetails(BuildContext context, VolunteerActivity activity) {
     showModalBottomSheet(
       context: context,
@@ -279,7 +270,6 @@ class _TrackerScreenState extends State<TrackerScreen> {
   }
 }
 
-// ==================== ACTIVITY CARD WIDGET ====================
 class _ActivityCard extends StatelessWidget {
   final VolunteerActivity activity;
   final VoidCallback onTap;
@@ -322,7 +312,7 @@ class _ActivityCard extends StatelessWidget {
   Widget _buildCardHeader(BuildContext context) {
     return Row(
       children: [
-        _buildActivityImage(),
+        _buildActivityImage(context),
         const SizedBox(width: 16),
         _buildActivityInfo(context),
         _buildArrowIcon(),
@@ -330,29 +320,55 @@ class _ActivityCard extends StatelessWidget {
     );
   }
 
-  Widget _buildActivityImage() {
+  Widget _buildActivityImage(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: CachedNetworkImage(
-        imageUrl: activity.imageUrl,
-        width: 60,
-        height: 60,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          width: 60,
-          height: 60,
-          color: AppTheme.lightGray,
-          child: const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-        errorWidget: (context, url, error) => Container(
-          width: 60,
-          height: 60,
-          color: AppTheme.lightGray,
-          child: const Icon(Icons.image_not_supported),
+      child: _buildImageWidget(activity.imageUrl, 60, 60, context),
+    );
+  }
+
+  Widget _buildImageWidget(String imageUrl, double width, double height, BuildContext context) {
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final base64String = imageUrl.split(',')[1];
+        final bytes = base64Decode(base64String);
+        return Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildPlaceholder(width, height);
+          },
+        );
+      } catch (e) {
+        return _buildPlaceholder(width, height);
+      }
+    }
+    
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        width: width,
+        height: height,
+        color: AppTheme.lightGray,
+        child: const Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
         ),
       ),
+      errorWidget: (context, url, error) => _buildPlaceholder(width, height),
+    );
+  }
+
+  Widget _buildPlaceholder(double width, double height) {
+    return Container(
+      width: width,
+      height: height,
+      color: AppTheme.lightGray,
+      child: const Icon(Icons.image_not_supported),
     );
   }
 
@@ -449,7 +465,6 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
-// ==================== ACTIVITY DETAILS SHEET ====================
 class _ActivityDetailsSheet extends StatelessWidget {
   final VolunteerActivity activity;
 
@@ -510,11 +525,41 @@ class _ActivityDetailsSheet extends StatelessWidget {
   Widget _buildActivityImage(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
-      child: CachedNetworkImage(
-        imageUrl: activity.imageUrl,
+      child: _buildImageWidget(context),
+    );
+  }
+
+  Widget _buildImageWidget(BuildContext context) {
+    if (activity.imageUrl.startsWith('data:image')) {
+      try {
+        final base64String = activity.imageUrl.split(',')[1];
+        final bytes = base64Decode(base64String);
+        return Image.memory(
+          bytes,
+          width: double.infinity,
+          height: 200,
+          fit: BoxFit.cover,
+        );
+      } catch (e) {
+        return Container(
+          width: double.infinity,
+          height: 200,
+          color: AppTheme.lightGray,
+          child: const Icon(Icons.image_not_supported, size: 48),
+        );
+      }
+    }
+    
+    return CachedNetworkImage(
+      imageUrl: activity.imageUrl,
+      width: double.infinity,
+      height: 200,
+      fit: BoxFit.cover,
+      errorWidget: (context, url, error) => Container(
         width: double.infinity,
         height: 200,
-        fit: BoxFit.cover,
+        color: AppTheme.lightGray,
+        child: const Icon(Icons.image_not_supported, size: 48),
       ),
     );
   }

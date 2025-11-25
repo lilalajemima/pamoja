@@ -23,7 +23,7 @@ class ProfileViewWidget extends StatelessWidget {
         children: [
           // Profile Header Section
           Container(
-            color: AppTheme.lightGray,
+            color: Theme.of(context).cardColor,
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Column(
               children: [
@@ -45,11 +45,40 @@ class ProfileViewWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
+                  profile.email,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.mediumGray,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
                   profile.role,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: AppTheme.primaryGreen,
                         fontWeight: FontWeight.w600,
                       ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          // Stats Section
+          Container(
+            color: Theme.of(context).cardColor,
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _StatCard(
+                  icon: Icons.access_time,
+                  label: 'Total Hours',
+                  value: profile.totalHours.toString(),
+                ),
+                _StatCard(
+                  icon: Icons.check_circle,
+                  label: 'Completed',
+                  value: profile.completedActivities.toString(),
                 ),
               ],
             ),
@@ -128,7 +157,9 @@ class ProfileViewWidget extends StatelessWidget {
                           margin: const EdgeInsets.only(bottom: 12),
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: AppTheme.lightGray,
+                            color: Theme.of(context).brightness == Brightness.dark 
+                                ? AppTheme.darkCard 
+                                : AppTheme.lightGray,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
@@ -136,31 +167,7 @@ class ProfileViewWidget extends StatelessWidget {
                               hasImage
                                   ? ClipRRect(
                                       borderRadius: BorderRadius.circular(12),
-                                      child: CachedNetworkImage(
-                                        imageUrl: history['imageUrl'],
-                                        width: 48,
-                                        height: 48,
-                                        fit: BoxFit.cover,
-                                        errorWidget: (context, url, error) => Container(
-                                          width: 48,
-                                          height: 48,
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.lightGreen,
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Center(
-                                            child: history['icon'] != null
-                                                ? Text(
-                                                    history['icon'],
-                                                    style: const TextStyle(fontSize: 24),
-                                                  )
-                                                : const Icon(
-                                                    Icons.volunteer_activism,
-                                                    color: AppTheme.primaryGreen,
-                                                  ),
-                                          ),
-                                        ),
-                                      ),
+                                      child: _buildImageWidget(history['imageUrl'], 48, 48),
                                     )
                                   : Container(
                                       width: 48,
@@ -275,9 +282,13 @@ class ProfileViewWidget extends StatelessWidget {
                                 base64Decode(cert.split(',')[1]),
                                 fit: BoxFit.cover,
                               )
-                            : Image.network(
-                                cert,
+                            : CachedNetworkImage(
+                                imageUrl: cert,
                                 fit: BoxFit.cover,
+                                errorWidget: (context, url, error) => Container(
+                                  color: AppTheme.lightGray,
+                                  child: const Icon(Icons.image_not_supported),
+                                ),
                               ),
                       ),
                     );
@@ -297,7 +308,7 @@ class ProfileViewWidget extends StatelessWidget {
     required Widget child,
   }) {
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -312,6 +323,55 @@ class ProfileViewWidget extends StatelessWidget {
           ),
           child,
         ],
+      ),
+    );
+  }
+
+  Widget _buildImageWidget(String imageUrl, double width, double height) {
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final base64String = imageUrl.split(',')[1];
+        final bytes = base64Decode(base64String);
+        return Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              width: width,
+              height: height,
+              color: AppTheme.lightGray,
+              child: const Icon(Icons.image_not_supported),
+            );
+          },
+        );
+      } catch (e) {
+        return Container(
+          width: width,
+          height: height,
+          color: AppTheme.lightGray,
+          child: const Icon(Icons.image_not_supported),
+        );
+      }
+    }
+    
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        width: width,
+        height: height,
+        color: AppTheme.lightGray,
+        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ),
+      errorWidget: (context, url, error) => Container(
+        width: width,
+        height: height,
+        color: AppTheme.lightGray,
+        child: const Icon(Icons.image_not_supported),
       ),
     );
   }
@@ -335,5 +395,46 @@ class ProfileViewWidget extends StatelessWidget {
     } catch (e) {
       return [];
     }
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _StatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.lightGreen.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.lightGreen),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: AppTheme.primaryGreen, size: 32),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: AppTheme.primaryGreen,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
   }
 }

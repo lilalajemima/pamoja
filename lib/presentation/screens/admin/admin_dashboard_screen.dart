@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:convert';
 import '../../../core/theme/app_theme.dart';
 import '../../blocs/admin_auth/admin_auth_bloc.dart';
 import '../../blocs/admin_opportunities/admin_opportunities_bloc.dart';
@@ -203,26 +204,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         contentPadding: const EdgeInsets.all(12),
                         leading: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: CachedNetworkImage(
-                            imageUrl: opportunity.imageUrl,
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              width: 60,
-                              height: 60,
-                              color: AppTheme.lightGray,
-                              child: const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => Container(
-                              width: 60,
-                              height: 60,
-                              color: AppTheme.lightGray,
-                              child: const Icon(Icons.image_not_supported),
-                            ),
-                          ),
+                          child: _buildImageWidget(opportunity.imageUrl, 60, 60),
                         ),
                         title: Text(
                           opportunity.title,
@@ -273,6 +255,57 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         );
       },
+    );
+  }
+
+  Widget _buildImageWidget(String imageUrl, double width, double height) {
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final base64String = imageUrl.split(',')[1];
+        final bytes = base64Decode(base64String);
+        return Image.memory(
+          bytes,
+          width: width,
+          height: height,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              width: width,
+              height: height,
+              color: AppTheme.lightGray,
+              child: const Icon(Icons.image_not_supported),
+            );
+          },
+        );
+      } catch (e) {
+        return Container(
+          width: width,
+          height: height,
+          color: AppTheme.lightGray,
+          child: const Icon(Icons.image_not_supported),
+        );
+      }
+    }
+    
+    return CachedNetworkImage(
+      imageUrl: imageUrl,
+      width: width,
+      height: height,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        width: width,
+        height: height,
+        color: AppTheme.lightGray,
+        child: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      errorWidget: (context, url, error) => Container(
+        width: width,
+        height: height,
+        color: AppTheme.lightGray,
+        child: const Icon(Icons.image_not_supported),
+      ),
     );
   }
 
