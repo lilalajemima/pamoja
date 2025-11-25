@@ -2,8 +2,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class NotificationService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore;
 
+  // Updated constructor with optional parameter - fully backward compatible!
+  NotificationService({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
+
+  // All your existing methods remain exactly the same - just use _firestore instead of FirebaseFirestore.instance
   // Create notification for a single user
   Future<void> createNotification({
     required String userId,
