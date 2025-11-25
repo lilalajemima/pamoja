@@ -65,11 +65,12 @@ class OpportunitiesLoaded extends OpportunitiesState {
   OpportunitiesLoaded copyWith({
     List<Opportunity>? opportunities,
     String? selectedCategory,
+    bool clearCategory = false,
     Set<String>? savedOpportunityIds,
   }) {
     return OpportunitiesLoaded(
       opportunities: opportunities ?? this.opportunities,
-      selectedCategory: selectedCategory ?? this.selectedCategory,
+      selectedCategory: clearCategory ? null : (selectedCategory ?? this.selectedCategory),
       savedOpportunityIds: savedOpportunityIds ?? this.savedOpportunityIds,
     );
   }
@@ -143,7 +144,8 @@ class OpportunitiesBloc extends Bloc<OpportunitiesEvent, OpportunitiesState> {
 
       emit(currentState.copyWith(
         opportunities: filtered,
-        selectedCategory: event.category.isEmpty ? null : event.category,
+        selectedCategory: event.category,
+        clearCategory: event.category.isEmpty,
       ));
     }
   }

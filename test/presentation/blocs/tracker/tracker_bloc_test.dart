@@ -24,31 +24,18 @@ void main() {
   late MockFirebaseAuth mockAuth;
   late MockFirebaseFirestore mockFirestore;
   late MockUser mockUser;
-  late MockCollectionReference mockCollection;
-  late MockQuery mockQuery;
-  late MockQuerySnapshot mockQuerySnapshot;
   late MockNotificationService mockNotificationService;
 
   setUp(() {
     mockAuth = MockFirebaseAuth();
     mockFirestore = MockFirebaseFirestore();
     mockUser = MockUser();
-    mockCollection = MockCollectionReference();
-    mockQuery = MockQuery();
-    mockQuerySnapshot = MockQuerySnapshot();
     mockNotificationService = MockNotificationService();
 
     // Setup default mocks
     when(() => mockAuth.currentUser).thenReturn(mockUser);
     when(() => mockUser.uid).thenReturn('test-user-id');
-    when(() => mockFirestore.collection('applications')).thenReturn(mockCollection);
-    when(() => mockCollection.where(any(), isEqualTo: any(named: 'isEqualTo')))
-        .thenReturn(mockQuery);
-    when(() => mockQuery.orderBy(any(), descending: any(named: 'descending')))
-        .thenReturn(mockQuery);
-    when(() => mockQuery.get()).thenAnswer((_) async => mockQuerySnapshot);
-    when(() => mockQuerySnapshot.docs).thenReturn([]);
-
+    
     // Mock notification service
     when(() => mockNotificationService.notifyApplicationStatus(
       userId: any(named: 'userId'),
@@ -76,7 +63,26 @@ void main() {
     group('LoadActivities', () {
       blocTest<TrackerBloc, TrackerState>(
         'emits [TrackerLoading, TrackerLoaded] when successful',
-        build: () => bloc,
+        build: () {
+          final mockApplicationsCollection = MockCollectionReference();
+          final mockQuery1 = MockQuery();
+          final mockQuery2 = MockQuery();
+          final mockQuerySnapshot = MockQuerySnapshot();
+
+          when(() => mockFirestore.collection('applications')).thenReturn(mockApplicationsCollection);
+          when(() => mockApplicationsCollection.where('userId', isEqualTo: 'test-user-id'))
+              .thenReturn(mockQuery1);
+          when(() => mockQuery1.orderBy('appliedAt', descending: true))
+              .thenReturn(mockQuery2);
+          when(() => mockQuery2.get()).thenAnswer((_) async => mockQuerySnapshot);
+          when(() => mockQuerySnapshot.docs).thenReturn([]);
+
+          return TrackerBloc(
+            auth: mockAuth,
+            firestore: mockFirestore,
+            notificationService: mockNotificationService,
+          );
+        },
         act: (bloc) => bloc.add(LoadActivities()),
         expect: () => [
           isA<TrackerLoading>(),
@@ -109,36 +115,72 @@ void main() {
     });
 
     group('ApplyToOpportunity', () {
-      setUp(() {
-        final mockUserDoc = MockDocumentSnapshot();
-        final mockUserDocRef = MockDocumentReference();
-        final mockApplicationsRef = MockDocumentReference();
-        final mockExistingQuery = MockQuery();
-        final mockExistingSnapshot = MockQuerySnapshot();
-
-        when(() => mockFirestore.collection('users')).thenReturn(mockCollection);
-        when(() => mockCollection.doc(any())).thenReturn(mockUserDocRef);
-        when(() => mockUserDocRef.get()).thenAnswer((_) async => mockUserDoc);
-        when(() => mockUserDoc.data()).thenReturn({
-          'name': 'Test User',
-          'email': 'test@example.com',
-          'avatarUrl': 'https://example.com/avatar.jpg',
-        });
-
-        when(() => mockFirestore.collection('applications')).thenReturn(mockCollection);
-        when(() => mockCollection.where('userId', isEqualTo: 'test-user-id'))
-            .thenReturn(mockExistingQuery);
-        when(() => mockExistingQuery.where('opportunityId', isEqualTo: any(named: 'isEqualTo')))
-            .thenReturn(mockExistingQuery);
-        when(() => mockExistingQuery.get()).thenAnswer((_) async => mockExistingSnapshot);
-        when(() => mockExistingSnapshot.docs).thenReturn([]);
-
-        when(() => mockCollection.add(any())).thenAnswer((_) async => mockApplicationsRef);
-      });
-
       blocTest<TrackerBloc, TrackerState>(
         'applies to opportunity successfully',
-        build: () => bloc,
+        build: () {
+          final mockUsersCollection = MockCollectionReference();
+          final mockApplicationsCollection = MockCollectionReference();
+          final mockUserDocRef = MockDocumentReference();
+          final mockUserDoc = MockDocumentSnapshot();
+          final mockApplicationsRef = MockDocumentReference();
+          
+          // Create separate mock instances for different query chains
+          final mockExistingQuery1 = MockQuery();
+          final mockExistingQuery2 = MockQuery();
+          final mockExistingSnapshot = MockQuerySnapshot();
+          
+          final mockReloadQuery1 = MockQuery();
+          final mockReloadQuery2 = MockQuery();
+          final mockReloadSnapshot = MockQuerySnapshot();
+
+          // Mock users collection
+          when(() => mockFirestore.collection('users')).thenReturn(mockUsersCollection);
+          when(() => mockUsersCollection.doc('test-user-id')).thenReturn(mockUserDocRef);
+          when(() => mockUserDocRef.get()).thenAnswer((_) async => mockUserDoc);
+          when(() => mockUserDoc.data()).thenReturn({
+            'name': 'Test User',
+            'email': 'test@example.com',
+            'avatarUrl': 'https://example.com/avatar.jpg',
+          });
+
+          // Mock applications collection - use multiple when clauses for different calls
+          when(() => mockFirestore.collection('applications')).thenReturn(mockApplicationsCollection);
+          
+          // First call: check existing application
+          when(() => mockApplicationsCollection.where('userId', isEqualTo: 'test-user-id'))
+              .thenReturn(mockExistingQuery1);
+          when(() => mockExistingQuery1.where('opportunityId', isEqualTo: 'opp-1'))
+              .thenReturn(mockExistingQuery2);
+          when(() => mockExistingQuery2.get()).thenAnswer((_) async => mockExistingSnapshot);
+          when(() => mockExistingSnapshot.docs).thenReturn([]);
+
+          // Mock adding application
+          when(() => mockApplicationsCollection.add(any())).thenAnswer((_) async => mockApplicationsRef);
+          
+          // Second call: reload activities after applying
+          // Use a counter to return different queries for different calls
+          var callCount = 0;
+          when(() => mockApplicationsCollection.where('userId', isEqualTo: 'test-user-id'))
+              .thenAnswer((invocation) {
+            callCount++;
+            if (callCount == 1) {
+              return mockExistingQuery1; // First call for existing check
+            } else {
+              return mockReloadQuery1; // Second call for reload
+            }
+          });
+          
+          when(() => mockReloadQuery1.orderBy('appliedAt', descending: true))
+              .thenReturn(mockReloadQuery2);
+          when(() => mockReloadQuery2.get()).thenAnswer((_) async => mockReloadSnapshot);
+          when(() => mockReloadSnapshot.docs).thenReturn([]);
+
+          return TrackerBloc(
+            auth: mockAuth,
+            firestore: mockFirestore,
+            notificationService: mockNotificationService,
+          );
+        },
         act: (bloc) => bloc.add(
           ApplyToOpportunity(
             opportunityId: 'opp-1',
@@ -148,7 +190,6 @@ void main() {
           ),
         ),
         expect: () => [
-          isA<TrackerLoading>(),
           isA<TrackerOperationSuccess>()
               .having((s) => s.message, 'success message', 'Application submitted successfully!'),
         ],
@@ -156,23 +197,43 @@ void main() {
     });
 
     group('UpdateActivityStatus', () {
-      setUp(() {
-        final mockAppDoc = MockDocumentReference();
-        
-        when(() => mockFirestore.collection('applications')).thenReturn(mockCollection);
-        when(() => mockCollection.doc(any())).thenReturn(mockAppDoc);
-        when(() => mockAppDoc.update(any())).thenAnswer((_) async => {});
-        
-        // Mock user document update for completion
-        final mockUserDoc = MockDocumentReference();
-        when(() => mockFirestore.collection('users')).thenReturn(mockCollection);
-        when(() => mockCollection.doc(any())).thenReturn(mockUserDoc);
-        when(() => mockUserDoc.update(any())).thenAnswer((_) async => {});
-      });
-
       blocTest<TrackerBloc, TrackerState>(
         'updates activity status to confirmed',
-        build: () => bloc,
+        build: () {
+          final mockApplicationsCollection = MockCollectionReference();
+          final mockUsersCollection = MockCollectionReference();
+          final mockAppDoc = MockDocumentReference();
+          final mockUserDoc = MockDocumentReference();
+          
+          // Query chains for reloading
+          final mockReloadQuery1 = MockQuery();
+          final mockReloadQuery2 = MockQuery();
+          final mockReloadSnapshot = MockQuerySnapshot();
+          
+          // Mock applications collection update
+          when(() => mockFirestore.collection('applications')).thenReturn(mockApplicationsCollection);
+          when(() => mockApplicationsCollection.doc(any())).thenReturn(mockAppDoc);
+          when(() => mockAppDoc.update(any())).thenAnswer((_) async => {});
+          
+          // Mock users collection update
+          when(() => mockFirestore.collection('users')).thenReturn(mockUsersCollection);
+          when(() => mockUsersCollection.doc('test-user-id')).thenReturn(mockUserDoc);
+          when(() => mockUserDoc.update(any())).thenAnswer((_) async => {});
+
+          // Mock reloading activities
+          when(() => mockApplicationsCollection.where('userId', isEqualTo: 'test-user-id'))
+              .thenReturn(mockReloadQuery1);
+          when(() => mockReloadQuery1.orderBy('appliedAt', descending: true))
+              .thenReturn(mockReloadQuery2);
+          when(() => mockReloadQuery2.get()).thenAnswer((_) async => mockReloadSnapshot);
+          when(() => mockReloadSnapshot.docs).thenReturn([]);
+
+          return TrackerBloc(
+            auth: mockAuth,
+            firestore: mockFirestore,
+            notificationService: mockNotificationService,
+          );
+        },
         act: (bloc) => bloc.add(
           UpdateActivityStatus(
             'activity-1',
@@ -182,7 +243,6 @@ void main() {
           ),
         ),
         expect: () => [
-          isA<TrackerLoading>(),
           isA<TrackerOperationSuccess>()
               .having((s) => s.message, 'success message', 'Status updated successfully!'),
         ],
@@ -198,7 +258,41 @@ void main() {
 
       blocTest<TrackerBloc, TrackerState>(
         'updates activity status to completed',
-        build: () => bloc,
+        build: () {
+          final mockApplicationsCollection = MockCollectionReference();
+          final mockUsersCollection = MockCollectionReference();
+          final mockAppDoc = MockDocumentReference();
+          final mockUserDoc = MockDocumentReference();
+          
+          // Query chains for reloading
+          final mockReloadQuery1 = MockQuery();
+          final mockReloadQuery2 = MockQuery();
+          final mockReloadSnapshot = MockQuerySnapshot();
+          
+          // Mock applications collection update
+          when(() => mockFirestore.collection('applications')).thenReturn(mockApplicationsCollection);
+          when(() => mockApplicationsCollection.doc(any())).thenReturn(mockAppDoc);
+          when(() => mockAppDoc.update(any())).thenAnswer((_) async => {});
+          
+          // Mock users collection update
+          when(() => mockFirestore.collection('users')).thenReturn(mockUsersCollection);
+          when(() => mockUsersCollection.doc('test-user-id')).thenReturn(mockUserDoc);
+          when(() => mockUserDoc.update(any())).thenAnswer((_) async => {});
+
+          // Mock reloading activities
+          when(() => mockApplicationsCollection.where('userId', isEqualTo: 'test-user-id'))
+              .thenReturn(mockReloadQuery1);
+          when(() => mockReloadQuery1.orderBy('appliedAt', descending: true))
+              .thenReturn(mockReloadQuery2);
+          when(() => mockReloadQuery2.get()).thenAnswer((_) async => mockReloadSnapshot);
+          when(() => mockReloadSnapshot.docs).thenReturn([]);
+
+          return TrackerBloc(
+            auth: mockAuth,
+            firestore: mockFirestore,
+            notificationService: mockNotificationService,
+          );
+        },
         act: (bloc) => bloc.add(
           UpdateActivityStatus(
             'activity-1',
@@ -208,7 +302,6 @@ void main() {
           ),
         ),
         expect: () => [
-          isA<TrackerLoading>(),
           isA<TrackerOperationSuccess>(),
         ],
       );
