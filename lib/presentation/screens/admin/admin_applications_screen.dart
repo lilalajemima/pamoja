@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -485,6 +486,7 @@ class _ApplicationCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(width: 12),
                 _StatusBadge(status: status),
               ],
             ),
@@ -493,21 +495,8 @@ class _ApplicationCard extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    imageUrl: data['imageUrl'] ?? '',
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorWidget: (context, url, error) => Container(
-                      width: 60,
-                      height: 60,
-                      color: AppTheme.lightGray,
-                      child: const Icon(Icons.image_not_supported),
-                    ),
-                  ),
-                ),
+                // FIXED: Added proper base64 and network image handling
+                _buildOpportunityImage(data['imageUrl'] ?? ''),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -572,6 +561,76 @@ class _ApplicationCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  // FIXED: New method to properly handle both base64 and network images
+  Widget _buildOpportunityImage(String imageUrl) {
+    if (imageUrl.isEmpty) {
+      return _buildErrorWidget();
+    }
+
+    // Check if it's a base64 image
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final base64String = imageUrl.split(',')[1];
+        final bytes = base64Decode(base64String);
+        
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.memory(
+            bytes,
+            width: 60,
+            height: 60,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return _buildErrorWidget();
+            },
+          ),
+        );
+      } catch (e) {
+        print('Error decoding base64 image: $e');
+        return _buildErrorWidget();
+      }
+    }
+    
+    // It's a network URL
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: CachedNetworkImage(
+        imageUrl: imageUrl,
+        width: 60,
+        height: 60,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Container(
+          width: 60,
+          height: 60,
+          color: AppTheme.lightGray,
+          child: const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        errorWidget: (context, url, error) {
+          print('Error loading network image: $error');
+          return _buildErrorWidget();
+        },
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: AppTheme.lightGray,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(
+        Icons.image_not_supported,
+        color: AppTheme.mediumGray,
+        size: 30,
       ),
     );
   }
